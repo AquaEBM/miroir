@@ -91,4 +91,4 @@ Most mirror implementations, with all of their functionalities, are simple and c
 
 ## Note
 
-This project is currently undergoing (yet another hehe) major refactor, in which the core `Mirror` trait and simulation engine will be seperated into their own crate `mirror_verse` from other exposed functionalities, that will, then, be seen as extensions/integrations.
+This project is currently undergoing (yet another hehe) major refactor, in which the core `Mirror` trait and simulation engine will be seperated into their own crate `mirror_verse` from other exposed functionalities, that will, then, be seen as extensions/integrations, in order to allow other users to seemlessly extend this crate into the broader Rust ecosystem.

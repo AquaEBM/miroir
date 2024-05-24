@@ -16,10 +16,10 @@
 	],
 	"mirror": {
 		"type": "[]dynamic",
-		"mirror": [
+		"data": [
 			{
 				"type": "sphere",
-				"mirror": {
+				"data": {
 					"center": [
 						0.0,
 						0.0,
@@ -30,7 +30,7 @@
 			},
 			{
 				"type": "[]plane",
-				"mirror": [
+				"data": [
 					{
 						"center": [
 							5.0,

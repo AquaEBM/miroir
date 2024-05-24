@@ -36,7 +36,7 @@ fn deserialize_boxed<const D: usize>(
         .as_str()
         .ok_or("type must be a string")?;
 
-    let mirror_json = json.get("mirror").ok_or("Missing mirror data")?;
+    let mirror_json = json.get("data").ok_or("Missing mirror data")?;
 
     let deserializer = deserializers
         .get(mirror_type.trim_start_matches("[]"))
@@ -61,7 +61,7 @@ impl reflect_json::JsonDes for Box<dyn SimulationMirror<2>> {
     /// ```json
     /// {
     ///     "type": "string",
-    ///     "mirror": // <layout depends on the value at "type">
+    ///     "data": // <layout depends on the value at "type">
     /// }
     /// ```
     fn from_json(json: &serde_json::Value) -> Result<Self, Box<dyn Error>> {
@@ -97,7 +97,7 @@ impl reflect_json::JsonDes for Box<dyn SimulationMirror<3>> {
     /// ```json
     /// {
     ///     "type": "string",
-    ///     "mirror": // <layout depends on the value at "type">
+    ///     "data": // <layout depends on the value at "type">
     /// }
     /// ```
     fn from_json(json: &serde_json::Value) -> Result<Self, Box<dyn Error>> {

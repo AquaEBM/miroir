@@ -53,7 +53,7 @@ impl<const D: usize> PlaneMirror<D> {
 }
 
 impl<const D: usize> Mirror<D> for PlaneMirror<D> {
-    fn append_intersecting_points(&self, ray: &Ray<D>, mut list: List<TangentPlane<D>>) {
+    fn append_intersecting_points(&self, ray: &Ray<D>, mut list: util::List<TangentPlane<D>>) {
         let p = self.inner_plane();
 
         let intersection_coords = p.intersection_coordinates(ray, p.v0());
@@ -136,11 +136,22 @@ impl<const D: usize> JsonSer for PlaneMirror<D> {
     }
 }
 
-struct PlaneRenderData<const D: usize> {
-    vertices: gl::VertexBuffer<render::Vertex<D>>,
+impl<const D: usize> Random for PlaneMirror<D> {
+    fn random(rng: &mut (impl rand::Rng + ?Sized)) -> Self {
+        loop {
+            if let Some(mirror) = Self::try_new(array::from_fn(|_| util::rand_vect(rng, 10.0))) {
+                break mirror;
+            }
+        }
+    }
 }
 
-impl<const D: usize> render::RenderData for PlaneRenderData<D> {
+
+struct PlaneRenderData<const D: usize> {
+    vertices: gl::VertexBuffer<Vertex<D>>,
+}
+
+impl<const D: usize> RenderData for PlaneRenderData<D> {
     fn vertices(&self) -> gl::vertex::VerticesSource {
         (&self.vertices).into()
     }
@@ -156,13 +167,13 @@ impl<const D: usize> render::RenderData for PlaneRenderData<D> {
     }
 }
 
-impl render::OpenGLRenderable for PlaneMirror<2> {
+impl OpenGLRenderable for PlaneMirror<2> {
     fn append_render_data(
         &self,
         display: &gl::Display,
-        mut list: List<Box<dyn render::RenderData>>,
+        mut list: util::List<Box<dyn RenderData>>,
     ) {
-        let vertices: Vec<_> = self.vertices().map(render::Vertex::<2>::from).collect();
+        let vertices: Vec<_> = self.vertices().map(Vertex2D::from).collect();
 
         list.push(Box::new(PlaneRenderData {
             vertices: gl::VertexBuffer::new(display, vertices.as_slice()).unwrap(),
@@ -170,27 +181,17 @@ impl render::OpenGLRenderable for PlaneMirror<2> {
     }
 }
 
-impl render::OpenGLRenderable for PlaneMirror<3> {
+impl OpenGLRenderable for PlaneMirror<3> {
     fn append_render_data(
         &self,
         display: &gl::Display,
-        mut list: List<Box<dyn render::RenderData>>,
+        mut list: util::List<Box<dyn RenderData>>,
     ) {
-        let vertices: Vec<_> = self.vertices().map(render::Vertex::<3>::from).collect();
+        let vertices: Vec<_> = self.vertices().map(Vertex3D::from).collect();
 
         list.push(Box::new(PlaneRenderData {
             vertices: gl::VertexBuffer::new(display, vertices.as_slice()).unwrap(),
         }))
-    }
-}
-
-impl<const D: usize> Random for PlaneMirror<D> {
-    fn random(rng: &mut (impl rand::Rng + ?Sized)) -> Self {
-        loop {
-            if let Some(mirror) = Self::try_new(array::from_fn(|_| util::rand_vect(rng, 10.0))) {
-                break mirror;
-            }
-        }
     }
 }
 
@@ -217,7 +218,7 @@ mod tests {
         };
 
         let mut intersections = vec![];
-        mirror.append_intersecting_points(&ray, List::from(&mut intersections));
+        mirror.append_intersecting_points(&ray, util::List::from(&mut intersections));
 
         let [tangent] = intersections.as_slice() else {
             panic!("there must be one intersection");
@@ -261,7 +262,7 @@ mod tests {
 
         let mut intersections = vec![];
 
-        mirror.append_intersecting_points(&ray, List::from(List::from(&mut intersections)));
+        mirror.append_intersecting_points(&ray, util::List::from(util::List::from(&mut intersections)));
 
         let [tangent] = intersections.as_slice() else {
             panic!("there must be an intersection");
@@ -304,7 +305,7 @@ mod tests {
         };
 
         let mut intersections = vec![];
-        mirror.append_intersecting_points(&ray, List::from(&mut intersections));
+        mirror.append_intersecting_points(&ray, util::List::from(&mut intersections));
 
         let [tangent] = intersections.as_slice() else {
             panic!("there must be an intersection");
@@ -356,8 +357,8 @@ mod tests {
         };
 
         let mut pts = vec![];
-        m1.append_intersecting_points(&ray, List::from(&mut pts));
-        m2.append_intersecting_points(&ray, List::from(&mut pts));
+        m1.append_intersecting_points(&ray, util::List::from(&mut pts));
+        m2.append_intersecting_points(&ray, util::List::from(&mut pts));
 
         let [t1, t2] = pts.as_slice() else {
             panic!("there must be an intersection");

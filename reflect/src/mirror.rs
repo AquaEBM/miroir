@@ -1,11 +1,6 @@
 use core::ops::Deref;
 
 use super::*;
-
-pub mod cylinder;
-pub mod plane;
-pub mod sphere;
-
 use util::List;
 
 /// A light ray, represented as a half-line.

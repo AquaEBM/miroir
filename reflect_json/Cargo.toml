@@ -1,0 +1,6 @@
+[package]
+name = "reflect_json"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]

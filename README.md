@@ -1,4 +1,4 @@
-# ✨ MirrorVerse ✨
+# ✨ reflect ✨
 
 Light ray reflection simulation with 3D rendering.
 

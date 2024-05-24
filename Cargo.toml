@@ -2,7 +2,10 @@
 
 members = [
     "gen_rand_sim",
-    "mirror_verse", 
+    "reflect",
+    "reflect_glium",
+    "reflect_json",
+    "reflect_mirrors", 
     "run_sim_json"
 ]
 

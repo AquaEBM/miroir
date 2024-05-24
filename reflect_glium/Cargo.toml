@@ -1,0 +1,11 @@
+[package]
+name = "reflect_glium"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+glium = "0.32"
+glium_shapes = { git = "https://github.com/FlashOnFire/glium_shapes.git", branch = "glium-0.32.2" }
+reflect = { path = "../reflect" }
+cgmath = "0.18"

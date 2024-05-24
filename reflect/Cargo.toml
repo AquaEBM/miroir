@@ -1,5 +1,5 @@
 [package]
-name = "mirror_verse"
+name = "reflect"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,7 +8,4 @@ edition = "2021"
 [dependencies]
 nalgebra = "0.32"
 serde_json = "1.0"
-cgmath = "0.18"
-glium = "0.32"
-glium_shapes = { git = "https://github.com/FlashOnFire/glium_shapes.git", branch = "glium-0.32.2" }
 rand = "0.8"

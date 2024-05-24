@@ -30,7 +30,7 @@ impl<const D: usize> EuclideanSphereMirror<D> {
 }
 
 impl<const D: usize> Mirror<D> for EuclideanSphereMirror<D> {
-    fn append_intersecting_points(&self, ray: &Ray<D>, mut list: List<TangentPlane<D>>) {
+    fn append_intersecting_points(&self, ray: &Ray<D>, mut list: util::List<TangentPlane<D>>) {
         // substituting V for P + t * D in the sphere equation: ||V - C||^2 - r^2 = 0
         // results in a quadratic equation in t, solve it using the discriminant method and
         // return the vector pointing from the center of the sphere to the point of intersection
@@ -114,44 +114,6 @@ impl<const D: usize> JsonSer for EuclideanSphereMirror<D> {
     }
 }
 
-// Use glium_shapes::sphere::Sphere for the 3D implementation
-impl render::OpenGLRenderable for EuclideanSphereMirror<3> {
-    fn append_render_data(
-        &self,
-        display: &gl::Display,
-        mut list: List<Box<dyn render::RenderData>>,
-    ) {
-        let r = *self.radius() as f32;
-        let [x, y, z] = self.center.map(|s| s as f32).into();
-
-        // The default sphere from the SphereBuilder is a unit-sphere (radius of 1) with its center of mass located at the origin.
-        // So we just have to scale it with the sphere radius on each axis and translate it.
-        let sphere = glium_shapes::sphere::SphereBuilder::new()
-            .scale(r, r, r)
-            .translate(x, y, z)
-            .with_divisions(60, 60)
-            .build(display)
-            .unwrap();
-
-        list.push(Box::new(sphere))
-    }
-}
-
-// in 2d, the list of vertices of a circle is easy to calculate
-impl render::OpenGLRenderable for EuclideanSphereMirror<2> {
-    fn append_render_data(
-        &self,
-        display: &gl::Display,
-        mut list: List<Box<dyn render::RenderData>>,
-    ) {
-        list.push(Box::new(render::Circle::new(
-            self.center.map(|s| s as f32).into(),
-            *self.radius() as f32,
-            display,
-        )))
-    }
-}
-
 impl<const D: usize> Random for EuclideanSphereMirror<D> {
     fn random(rng: &mut (impl rand::Rng + ?Sized)) -> Self {
         const MAX_RADIUS: Float = 3.0;
@@ -164,6 +126,44 @@ impl<const D: usize> Random for EuclideanSphereMirror<D> {
                 break mirror;
             }
         }
+    }
+}
+
+// Use glium_shapes::sphere::Sphere for the 3D implementation
+impl OpenGLRenderable for EuclideanSphereMirror<3> {
+    fn append_render_data(
+        &self,
+        display: &gl::Display,
+        mut list: util::List<Box<dyn RenderData>>,
+    ) {
+        let r = *self.radius() as f32;
+        let [x, y, z] = self.center.map(|s| s as f32).into();
+
+        // The default sphere from the SphereBuilder is a unit-sphere (radius of 1) with its center of mass located at the origin.
+        // So we just have to scale it with the sphere radius on each axis and translate it.
+        let sphere = gl_shapes::sphere::SphereBuilder::new()
+            .scale(r, r, r)
+            .translate(x, y, z)
+            .with_divisions(60, 60)
+            .build(display)
+            .unwrap();
+
+        list.push(Box::new(sphere))
+    }
+}
+
+// in 2d, the list of vertices of a circle is easy to calculate
+impl OpenGLRenderable for EuclideanSphereMirror<2> {
+    fn append_render_data(
+        &self,
+        display: &gl::Display,
+        mut list: util::List<Box<dyn RenderData>>,
+    ) {
+        list.push(Box::new(Circle::new(
+            self.center.map(|s| s as f32).into(),
+            *self.radius() as f32,
+            display,
+        )))
     }
 }
 
@@ -186,7 +186,7 @@ mod tests {
         };
 
         let mut intersections = vec![];
-        mirror.append_intersecting_points(&ray, List::from(&mut intersections));
+        mirror.append_intersecting_points(&ray, util::List::from(&mut intersections));
 
         assert_eq!(intersections.len(), 2);
 
@@ -225,7 +225,7 @@ mod tests {
         };
 
         let mut intersections = vec![];
-        mirror.append_intersecting_points(&ray, List::from(&mut intersections));
+        mirror.append_intersecting_points(&ray, util::List::from(&mut intersections));
 
         assert_eq!(intersections.len(), 0);
     }
@@ -244,7 +244,7 @@ mod tests {
         };
 
         let mut intersections = vec![];
-        mirror.append_intersecting_points(&ray, List::from(&mut intersections));
+        mirror.append_intersecting_points(&ray, util::List::from(&mut intersections));
 
         assert_eq!(intersections.len(), 2);
 

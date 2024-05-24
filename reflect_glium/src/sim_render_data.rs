@@ -1,94 +1,19 @@
-use core::ops::Deref;
-
 use super::*;
-use gl::{
-    glutin::dpi::PhysicalSize,
-    index::{NoIndices, PrimitiveType},
-    Blend, Surface, VertexBuffer,
-};
 
-pub(crate) mod camera;
+use gl::index::{NoIndices, PrimitiveType};
+const LINE_STRIP: NoIndices = NoIndices(PrimitiveType::LineStrip);
 
-#[derive(Copy, Clone, Debug)]
-pub struct Vertex<const N: usize> {
-    pub position: [f32; N],
-}
-
-pub type Vertex2D = Vertex<2>;
-glium::implement_vertex!(Vertex2D, position);
-
-pub type Vertex3D = Vertex<3>;
-glium::implement_vertex!(Vertex3D, position);
-
-impl<const D: usize> From<nalgebra::SVector<f32, D>> for Vertex<D> {
-    fn from(v: nalgebra::SVector<f32, D>) -> Self {
-        Self { position: v.into() }
-    }
-}
-
-impl<const D: usize> From<nalgebra::SVector<f64, D>> for Vertex<D> {
-    fn from(v: nalgebra::SVector<f64, D>) -> Self {
-        Self {
-            position: v.map(|s| s as f32).into(),
-        }
-    }
-}
-
-pub(crate) const FRAGMENT_SHADER_SRC: &str = r#"
-    #version 140
-
-    uniform vec4 color_vec;
-
-    out vec4 color;
-
-    void main() {
-        color = color_vec;
-    }
-"#;
-
-pub(crate) const VERTEX_SHADER_SRC_3D: &str = r#"
-    #version 140
-
-    in vec3 position;
-    uniform mat4 perspective;
-    uniform mat4 view;
-
-    void main() {
-        gl_Position = perspective * view * vec4(position, 1.0);
-    }
-"#;
-
-pub(crate) const VERTEX_SHADER_SRC_2D: &str = r#"
-    #version 140
-
-    in vec2 position;
-    uniform mat4 perspective;
-    uniform mat4 view;
-
-    void main() {
-        gl_Position = perspective * view * vec4(position, 0.0, 1.0);
-    }
-"#;
-
-pub(crate) struct RayRenderData<const D: usize> {
-    // TODO: find another way to draw this, that preserves
-    // it's size no matter how far away you are from it
-    pub origin: Box<dyn RenderData>,
-    pub non_loop_path: VertexBuffer<Vertex<D>>,
-    pub loop_path: VertexBuffer<Vertex<D>>,
-}
-
-pub(crate) struct DrawableSimulation<const D: usize> {
+pub(crate) struct SimRenderData<const D: usize> {
     ray_render_data: Vec<RayRenderData<D>>,
-    mirror_render_data: Vec<Box<dyn render::RenderData>>,
+    mirror_render_data: Vec<Box<dyn RenderData>>,
     program: gl::Program,
 }
 
-impl<const D: usize> DrawableSimulation<D>
+impl<const D: usize> SimRenderData<D>
 where
     Vertex<D>: gl::Vertex,
 {
-    pub(crate) fn new(
+    fn new(
         ray_render_data: Vec<RayRenderData<D>>,
         mirror_render_data: Vec<Box<dyn RenderData>>,
         program: gl::Program,
@@ -101,7 +26,89 @@ where
     }
 }
 
-impl<const D: usize> DrawableSimulation<D>
+const FRAGMENT_SHADER_SRC: &str = r#"
+    #version 140
+
+    uniform vec4 color_vec;
+
+    out vec4 color;
+
+    void main() {
+        color = color_vec;
+    }
+"#;
+
+impl SimRenderData<3> {
+    pub(crate) fn from_simulation<T: reflect::mirror::Mirror<3> + OpenGLRenderable>(
+        sim: &reflect::Simulation<T, 3>,
+        reflection_limit: usize,
+        display: &gl::Display,
+    ) -> Self {
+        const VERTEX_SHADER_SRC_3D: &str = r#"
+            #version 140
+
+            in vec3 position;
+            uniform mat4 perspective;
+            uniform mat4 view;
+
+            void main() {
+                gl_Position = perspective * view * vec4(position, 1.0);
+            }
+        "#;
+
+        let program =
+            gl::Program::from_source(display, VERTEX_SHADER_SRC_3D, FRAGMENT_SHADER_SRC, None)
+                .unwrap();
+
+        let mut render_data = vec![];
+
+        sim.mirror
+            .append_render_data(display, reflect::util::List::from(&mut render_data));
+
+        Self::new(
+            RayRenderData::<3>::from_simulation(sim, reflection_limit, display),
+            render_data,
+            program,
+        )
+    }
+}
+
+impl SimRenderData<2> {
+    pub(crate) fn from_simulation<T: reflect::mirror::Mirror<2> + OpenGLRenderable>(
+        sim: &reflect::Simulation<T, 2>,
+        reflection_limit: usize,
+        display: &gl::Display,
+    ) -> Self {
+        const VERTEX_SHADER_SRC_2D: &str = r#"
+            #version 140
+
+            in vec2 position;
+            uniform mat4 perspective;
+            uniform mat4 view;
+
+            void main() {
+                gl_Position = perspective * view * vec4(position, 0.0, 1.0);
+            }
+        "#;
+
+        let program =
+            gl::Program::from_source(display, VERTEX_SHADER_SRC_2D, FRAGMENT_SHADER_SRC, None)
+                .unwrap();
+
+        let mut render_data = vec![];
+
+        sim.mirror
+            .append_render_data(display, reflect::util::List::from(&mut render_data));
+
+        Self::new(
+            RayRenderData::<2>::from_simulation(sim, reflection_limit, display),
+            render_data,
+            program,
+        )
+    }
+}
+
+impl<const D: usize> SimRenderData<D>
 where
     Vertex<D>: gl::Vertex,
 {
@@ -116,7 +123,8 @@ where
         const NEAR_PLANE: f32 = 0.0001;
         const FAR_PLANE: f32 = 10000.;
 
-        let PhysicalSize { width, height } = display.gl_window().window().inner_size();
+        use glutin::{dpi, event, event_loop, window};
+        let dpi::PhysicalSize { width, height } = display.gl_window().window().inner_size();
 
         let mut projection = Projection::new(
             width,
@@ -131,7 +139,7 @@ where
 
         let mut camera_controller = CameraController::new(SPEED, MOUSE_SENSITIVITY);
 
-        let mut last_render_time = time::Instant::now();
+        let mut last_render_time = std::time::Instant::now();
         let mut mouse_pressed = false;
 
         events_loop.run(move |ev, _, control_flow| match ev {
@@ -163,12 +171,12 @@ where
                                 display
                                     .gl_window()
                                     .window()
-                                    .set_cursor_grab(CursorGrabMode::Locked)
+                                    .set_cursor_grab(window::CursorGrabMode::Locked)
                                     .or_else(|_| {
                                         display
                                             .gl_window()
                                             .window()
-                                            .set_cursor_grab(CursorGrabMode::Confined)
+                                            .set_cursor_grab(window::CursorGrabMode::Confined)
                                     })
                                     .unwrap();
 
@@ -180,7 +188,7 @@ where
                                 display
                                     .gl_window()
                                     .window()
-                                    .set_cursor_grab(CursorGrabMode::None)
+                                    .set_cursor_grab(window::CursorGrabMode::None)
                                     .unwrap();
                                 display.gl_window().window().set_cursor_visible(true);
                             }
@@ -208,7 +216,7 @@ where
                     display
                         .gl_window()
                         .window()
-                        .set_cursor_position(PhysicalPosition {
+                        .set_cursor_position(dpi::PhysicalPosition {
                             x: inner_window_size.width / 2,
                             y: inner_window_size.height / 2,
                         })
@@ -220,12 +228,7 @@ where
         });
     }
 
-    pub(crate) fn render_3d(
-        &self,
-        display: &gl::Display,
-        camera: &Camera,
-        projection: &Projection,
-    ) {
+    fn render_3d(&self, display: &gl::Display, camera: &Camera, projection: &Projection) {
         const ORIGIN_COLOR: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
         const RAY_NON_LOOP_COL: [f32; 4] = [0.7, 0.3, 0.1, 1.0];
         const RAY_LOOP_COL: [f32; 4] = [1.0, 0.0, 1.0, 1.0];
@@ -237,6 +240,7 @@ where
 
         let mut target = display.draw();
 
+        use gl::Surface;
         target.clear_color_and_depth((1., 0.95, 0.7, 1.), 1.0);
 
         let perspective = projection.get_matrix();
@@ -248,9 +252,9 @@ where
                 write: false,
                 ..Default::default()
             },
-            line_width: Some(2.0),
+            line_width: Some(1.0),
             multisampling: true,
-            blend: Blend::alpha_blending(),
+            blend: gl::Blend::alpha_blending(),
             ..Default::default()
         };
 
@@ -258,7 +262,7 @@ where
             target
                 .draw(
                     &ray.non_loop_path,
-                    NoIndices(PrimitiveType::LineStrip),
+                    LINE_STRIP,
                     &self.program,
                     &gl::uniform! {
                         perspective: perspective,
@@ -272,7 +276,7 @@ where
             target
                 .draw(
                     &ray.loop_path,
-                    NoIndices(PrimitiveType::LineStrip),
+                    LINE_STRIP,
                     &self.program,
                     &gl::uniform! {
                         perspective: perspective,
@@ -318,106 +322,5 @@ where
         target.finish().unwrap();
 
         display.gl_window().window().request_redraw();
-    }
-}
-
-/// A trait encompassing a shape that can be rendered
-///
-/// Mirrors implementing [`OpenGLRenderable`] return objects for this trait enabling them to be rendered
-/// on-screen in simulations.
-pub trait RenderData {
-    fn vertices(&self) -> gl::vertex::VerticesSource;
-    fn indices(&self) -> gl::index::IndicesSource;
-}
-
-// glium_shapes 3d convenience blanket impl
-impl<T> RenderData for T
-where
-    for<'a> &'a T: Into<gl::vertex::VerticesSource<'a>>,
-    for<'a> &'a T: Into<gl::index::IndicesSource<'a>>,
-{
-    fn vertices(&self) -> gl::vertex::VerticesSource {
-        self.into()
-    }
-
-    fn indices(&self) -> gl::index::IndicesSource {
-        self.into()
-    }
-}
-
-pub trait OpenGLRenderable {
-    fn append_render_data(&self, display: &gl::Display, list: util::List<Box<dyn RenderData>>);
-}
-
-impl<T: OpenGLRenderable> OpenGLRenderable for [T] {
-    fn append_render_data(&self, display: &gl::Display, mut list: util::List<Box<dyn RenderData>>) {
-        self.iter()
-            .for_each(|a| a.append_render_data(display, list.reborrow()))
-    }
-}
-
-impl<T: Deref> OpenGLRenderable for T
-where
-    T::Target: OpenGLRenderable,
-{
-    fn append_render_data(&self, display: &gl::Display, list: util::List<Box<dyn RenderData>>) {
-        self.deref().append_render_data(display, list)
-    }
-}
-
-pub(crate) struct Circle {
-    pub vertices: gl::VertexBuffer<Vertex2D>,
-}
-
-impl Circle {
-    pub fn new(center: [f32; 2], radius: f32, display: &gl::Display) -> Self {
-        const NUM_POINTS: usize = 360;
-
-        let c = SVector::from(center);
-
-        use core::f32::consts::TAU;
-
-        let points: Vec<Vertex2D> = (0..NUM_POINTS)
-            .map(|i| {
-                let pos: [f32; 2] = (i as f32 / NUM_POINTS as f32 * TAU).sin_cos().into();
-                (SVector::from(pos) * radius + c).into()
-            })
-            .collect();
-
-        let vertices = gl::VertexBuffer::immutable(display, points.as_slice()).unwrap();
-
-        Self { vertices }
-    }
-}
-
-impl RenderData for Circle {
-    fn vertices(&self) -> gl::vertex::VerticesSource {
-        (&self.vertices).into()
-    }
-
-    fn indices(&self) -> gl::index::IndicesSource {
-        gl::index::IndicesSource::NoIndices {
-            primitives: gl::index::PrimitiveType::LineLoop,
-        }
-    }
-}
-
-pub(crate) struct FilledCircle(Circle);
-
-impl From<Circle> for FilledCircle {
-    fn from(value: Circle) -> Self {
-        Self(value)
-    }
-}
-
-impl RenderData for FilledCircle {
-    fn vertices(&self) -> gl::vertex::VerticesSource {
-        self.0.vertices()
-    }
-
-    fn indices(&self) -> gl::index::IndicesSource {
-        gl::index::IndicesSource::NoIndices {
-            primitives: gl::index::PrimitiveType::TriangleFan,
-        }
     }
 }

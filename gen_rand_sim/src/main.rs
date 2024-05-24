@@ -1,10 +1,12 @@
 use core::{iter, ops::Deref};
 use std::{env, error::Error, fs::File};
 
-use mirror_verse::{
-    mirror::{self, Random, JsonSer},
+use reflect::{
+    mirror::{self, JsonSer, Random},
     rand, serde_json, Simulation,
 };
+
+use reflect_mirrors::*;
 
 trait JsonTypeDyn {
     fn json_type_dyn(&self) -> String;
@@ -25,8 +27,8 @@ struct Dynamic<T, const D: usize>(T);
 impl mirror::Random for Dynamic<Box<dyn JsonSerDyn>, 2> {
     fn random(rng: &mut (impl rand::Rng + ?Sized)) -> Self {
         Self(match rng.gen_range(0usize..2) {
-            0 => Box::new(mirror::plane::PlaneMirror::<2>::random(rng)) as Box<dyn JsonSerDyn>,
-            1 => Box::new(mirror::sphere::EuclideanSphereMirror::<2>::random(rng)),
+            0 => Box::new(PlaneMirror::<2>::random(rng)) as Box<dyn JsonSerDyn>,
+            1 => Box::new(EuclideanSphereMirror::<2>::random(rng)),
             _ => unreachable!(),
         })
     }
@@ -35,9 +37,9 @@ impl mirror::Random for Dynamic<Box<dyn JsonSerDyn>, 2> {
 impl mirror::Random for Dynamic<Box<dyn JsonSerDyn>, 3> {
     fn random(rng: &mut (impl rand::Rng + ?Sized)) -> Self {
         Self(match rng.gen_range(0usize..3) {
-            0 => Box::new(mirror::plane::PlaneMirror::<3>::random(rng)) as Box<dyn JsonSerDyn>,
-            1 => Box::new(mirror::sphere::EuclideanSphereMirror::<3>::random(rng)),
-            2 => Box::new(mirror::cylinder::CylindricalMirror::random(rng)),
+            0 => Box::new(PlaneMirror::<3>::random(rng)) as Box<dyn JsonSerDyn>,
+            1 => Box::new(EuclideanSphereMirror::<3>::random(rng)),
+            2 => Box::new(CylindricalMirror::random(rng)),
             _ => unreachable!(),
         })
     }

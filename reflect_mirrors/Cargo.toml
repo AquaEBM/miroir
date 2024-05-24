@@ -1,9 +1,9 @@
 [package]
-name = "gen_rand_sim"
+name = "reflect_mirrors"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 
 reflect = { path = "../reflect" }
-reflect_mirrors = { path = "../reflect_mirrors" }
+reflect_glium = { path = "../reflect_glium" }

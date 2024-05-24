@@ -2,22 +2,13 @@ extern crate alloc;
 
 // re-export deps for convenience
 pub mod mirror;
-pub mod render;
-pub use glium as gl;
 pub use nalgebra;
 pub use rand;
 pub use serde_json;
 
-use cgmath as cg;
 use core::iter;
-use gl::glutin::{self, dpi::PhysicalPosition, event, event_loop, window::CursorGrabMode};
 use nalgebra::{SMatrix, SVector, Unit};
-use std::{error::Error, time};
-
-use render::{
-    camera::{Camera, CameraController, Projection},
-    DrawableSimulation,
-};
+use std::error::Error;
 
 use mirror::{JsonDes, JsonSer};
 
@@ -94,36 +85,6 @@ impl<const D: usize> RayPath<D> {
         self.divergence_direction = Some(dir);
         first_time
     }
-
-    pub(crate) fn path_vertices(
-        &self,
-        display: &gl::Display,
-    ) -> (
-        gl::VertexBuffer<render::Vertex<D>>,
-        gl::VertexBuffer<render::Vertex<D>>,
-    )
-    where
-        render::Vertex<D>: gl::Vertex,
-    {
-        let (non_loop_pts, loop_pts) = self.all_points();
-
-        let non_loop_pts = Vec::from_iter(
-            non_loop_pts
-                .iter()
-                .copied()
-                .chain(
-                    self.divergence_direction()
-                        .map(|dir| non_loop_pts.last().unwrap() + dir.as_ref() * 2000.),
-                )
-                .map(render::Vertex::from),
-        );
-        let loop_pts = Vec::from_iter(loop_pts.iter().copied().map(render::Vertex::from));
-
-        (
-            gl::VertexBuffer::immutable(display, non_loop_pts.as_slice()).unwrap(),
-            gl::VertexBuffer::immutable(display, loop_pts.as_slice()).unwrap(),
-        )
-    }
 }
 
 pub struct Simulation<T, const D: usize> {
@@ -134,7 +95,7 @@ pub struct Simulation<T, const D: usize> {
 impl<T: mirror::Random, const D: usize> mirror::Random for Simulation<T, D> {
     fn random(rng: &mut (impl rand::Rng + ?Sized)) -> Self
     where
-        Self: Sized
+        Self: Sized,
     {
         const MIN_NUM_RAYS: usize = 1;
         const MAX_NUM_RAYS: usize = 32;
@@ -214,164 +175,6 @@ impl<const D: usize, T: mirror::Mirror<D>> Simulation<T, D> {
                 ray_path
             })
             .collect()
-    }
-}
-
-impl<T: mirror::Mirror<3>> Simulation<T, 3> {
-    fn ray_render_data(
-        &self,
-        reflection_limit: usize,
-        display: &gl::Display,
-    ) -> Vec<render::RayRenderData<3>> {
-        self.get_ray_paths(reflection_limit)
-            .into_iter()
-            .map(|ray_path| {
-                // we'll change this to a square or circle that's doesn't get scaled by the projection matrix
-                // use Sphere for 3D, and Circle for 2D
-                let [x, y, z] = ray_path
-                    .all_points_raw()
-                    .first()
-                    .unwrap()
-                    .map(|s| s as f32)
-                    .into();
-
-                let (non_loop_path, loop_path) = ray_path.path_vertices(display);
-
-                render::RayRenderData {
-                    origin: Box::new(
-                        glium_shapes::sphere::SphereBuilder::new()
-                            .scale(0.1, 0.1, 0.1)
-                            .translate(x, y, z)
-                            .with_divisions(60, 60)
-                            .build(display)
-                            .unwrap(),
-                    ),
-                    non_loop_path,
-                    loop_path,
-                }
-            })
-            .collect()
-    }
-}
-
-impl<T: mirror::Mirror<2>> Simulation<T, 2> {
-    fn ray_render_data(
-        &self,
-        reflection_limit: usize,
-        display: &gl::Display,
-    ) -> Vec<render::RayRenderData<2>> {
-        self.get_ray_paths(reflection_limit)
-            .into_iter()
-            .map(|ray_path| {
-                // we'll change this to a square or circle that's doesn't get scaled by the projection matrix
-                // use Sphere for 3D, and Circle for 2D
-                let center = ray_path
-                    .all_points_raw()
-                    .first()
-                    .unwrap()
-                    .map(|s| s as f32)
-                    .into();
-
-                let (non_loop_path, loop_path) = ray_path.path_vertices(display);
-
-                render::RayRenderData {
-                    origin: Box::new(render::FilledCircle::from(render::Circle::new(
-                        center, 0.1, display,
-                    ))),
-                    non_loop_path,
-                    loop_path,
-                }
-            })
-            .collect()
-    }
-}
-
-impl<T: mirror::Mirror<2> + render::OpenGLRenderable> Simulation<T, 2> {
-    fn to_drawable(&self, reflection_limit: usize, display: &gl::Display) -> DrawableSimulation<2> {
-        let program = gl::Program::from_source(
-            display,
-            render::VERTEX_SHADER_SRC_2D,
-            render::FRAGMENT_SHADER_SRC,
-            None,
-        )
-        .unwrap();
-
-        DrawableSimulation::new(
-            self.ray_render_data(reflection_limit, display),
-            self.mirror_render_data(display),
-            program,
-        )
-    }
-
-    pub fn run_opengl_3d(&self, reflection_limit: usize) {
-        let events_loop = glutin::event_loop::EventLoop::new();
-
-        const DEFAULT_WIDTH: u32 = 1280;
-        const DEFAULT_HEIGHT: u32 = 720;
-
-        let wb = glutin::window::WindowBuilder::new()
-            .with_inner_size(glutin::dpi::LogicalSize::new(DEFAULT_WIDTH, DEFAULT_HEIGHT))
-            .with_title("MirrorVerse");
-
-        let cb = glutin::ContextBuilder::new()
-            .with_vsync(true)
-            .with_multisampling(1 << 8);
-
-        let display = gl::Display::new(wb, cb, &events_loop).unwrap();
-
-        let drawable_simulation = self.to_drawable(reflection_limit, &display);
-
-        drawable_simulation.run(display, events_loop);
-    }
-}
-
-impl<const D: usize, T: render::OpenGLRenderable> Simulation<T, D> {
-    pub fn mirror_render_data(&self, display: &gl::Display) -> Vec<Box<dyn render::RenderData>> {
-        let mut render_data = vec![];
-
-        self.mirror
-            .append_render_data(display, util::List::from(&mut render_data));
-
-        render_data
-    }
-}
-
-impl<T: mirror::Mirror<3> + render::OpenGLRenderable> Simulation<T, 3> {
-    fn to_drawable(&self, reflection_limit: usize, display: &gl::Display) -> DrawableSimulation<3> {
-        let program = gl::Program::from_source(
-            display,
-            render::VERTEX_SHADER_SRC_3D,
-            render::FRAGMENT_SHADER_SRC,
-            None,
-        )
-        .unwrap();
-
-        DrawableSimulation::new(
-            self.ray_render_data(reflection_limit, display),
-            self.mirror_render_data(display),
-            program,
-        )
-    }
-
-    pub fn run_opengl_3d(&self, reflection_limit: usize) {
-        let events_loop = glutin::event_loop::EventLoop::new();
-
-        const DEFAULT_WIDTH: u32 = 1280;
-        const DEFAULT_HEIGHT: u32 = 720;
-
-        let wb = glutin::window::WindowBuilder::new()
-            .with_inner_size(glutin::dpi::LogicalSize::new(DEFAULT_WIDTH, DEFAULT_HEIGHT))
-            .with_title("MirrorVerse");
-
-        let cb = glutin::ContextBuilder::new()
-            .with_vsync(true)
-            .with_multisampling(1 << 8);
-
-        let display = gl::Display::new(wb, cb, &events_loop).unwrap();
-
-        let drawable_simulation = self.to_drawable(reflection_limit, &display);
-
-        drawable_simulation.run(display, events_loop);
     }
 }
 

@@ -1,5 +1,3 @@
-use self::render::OpenGLRenderable;
-
 use super::*;
 
 /// An open, cylinder-shaped mirror,
@@ -44,7 +42,7 @@ impl CylindricalMirror {
 }
 
 impl Mirror<3> for CylindricalMirror {
-    fn append_intersecting_points(&self, ray: &Ray<3>, mut list: List<TangentPlane<3>>) {
+    fn append_intersecting_points(&self, ray: &Ray<3>, mut list: util::List<TangentPlane<3>>) {
         let line_coord = |v| self.dist.dot(&v) * self.inv_norm_dist_squared;
         let p = |v| line_coord(v) * self.dist;
 
@@ -145,11 +143,27 @@ impl JsonSer for CylindricalMirror {
     }
 }
 
-struct CylinderRenderData {
-    vertices: gl::VertexBuffer<render::Vertex3D>,
+impl Random for CylindricalMirror {
+    fn random(rng: &mut (impl rand::Rng + ?Sized)) -> Self
+    where
+        Self: Sized,
+    {
+        loop {
+            if let Some(mirror) = Self::new(
+                [util::rand_vect(rng, 10.0), util::rand_vect(rng, 10.0)],
+                rng.gen::<Float>() * 4.0,
+            ) {
+                break mirror;
+            }
+        }
+    }
 }
 
-impl render::RenderData for CylinderRenderData {
+struct CylinderRenderData {
+    vertices: gl::VertexBuffer<Vertex3D>,
+}
+
+impl RenderData for CylinderRenderData {
     fn vertices(&self) -> gl::vertex::VerticesSource {
         (&self.vertices).into()
     }
@@ -165,19 +179,19 @@ impl OpenGLRenderable for CylindricalMirror {
     fn append_render_data(
         &self,
         display: &gl::Display,
-        mut list: List<Box<dyn render::RenderData>>,
+        mut list: util::List<Box<dyn RenderData>>,
     ) {
         const NUM_POINTS: usize = 360;
 
         let d = self.segment_length().map(|s| s as f32);
 
-        let k = SVector::from([0.0, 0.0, 1.0]) + d.normalize();
+        let k = nalgebra::SVector::from([0.0, 0.0, 1.0]) + d.normalize();
 
         // outer product of d and k
-        let m = SMatrix::<_, 3, 3>::from_fn(|i, j| k[i] * k[j]);
+        let m = nalgebra::SMatrix::<_, 3, 3>::from_fn(|i, j| k[i] * k[j]);
 
         // rotation matrix to rotate the circle so it faces the axis formed by our line segment
-        let rot = 2.0 / k.norm_squared() * m - SMatrix::identity();
+        let rot = 2.0 / k.norm_squared() * m - nalgebra::SMatrix::identity();
 
         let r = self.radius() as f32;
         let start = self.line_segment()[0].map(|s| s as f32);
@@ -188,30 +202,14 @@ impl OpenGLRenderable for CylindricalMirror {
             .flat_map(|i| {
                 let [x, y]: [f32; 2] = (i as f32 / NUM_POINTS as f32 * TAU).sin_cos().into();
                 let vertex = [x * r, y * r, 0.0];
-                let v = rot * SVector::from(vertex) + start;
+                let v = rot * nalgebra::SVector::from(vertex) + start;
                 [v, v + d]
             })
-            .map(render::Vertex3D::from)
+            .map(Vertex3D::from)
             .collect();
 
         let vertices = gl::VertexBuffer::immutable(display, vertices.as_slice()).unwrap();
 
         list.push(Box::new(CylinderRenderData { vertices }))
-    }
-}
-
-impl Random for CylindricalMirror {
-    fn random(rng: &mut (impl rand::Rng + ?Sized)) -> Self
-    where
-        Self: Sized,
-    {
-        loop {
-            if let Some(mirror) = Self::new(
-                [util::rand_vect(rng, 10.0), util::rand_vect(rng, 10.0)],
-                rng.gen::<Float>() * 4.0,
-            ) {
-                break mirror;
-            }
-        }
     }
 }

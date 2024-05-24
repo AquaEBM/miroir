@@ -1,16 +1,21 @@
-use mirror_verse::{
+use reflect::{
     mirror::{
-        self, cylinder::CylindricalMirror, plane::PlaneMirror, sphere::EuclideanSphereMirror,
-        JsonType,
+        self,
         JsonDes,
+        JsonType,
     },
-    render, serde_json, util, Simulation,
+    serde_json, util, Simulation,
 };
+
+use reflect_glium;
+
+use reflect_mirrors::*;
+
 use std::{collections::HashMap, error::Error, format as f, fs::File, sync::OnceLock};
 
-trait SimulationMirror<const D: usize>: mirror::Mirror<D> + render::OpenGLRenderable {}
+trait SimulationMirror<const D: usize>: mirror::Mirror<D> + reflect_glium::OpenGLRenderable {}
 
-impl<const D: usize, T: mirror::Mirror<D> + render::OpenGLRenderable + ?Sized> SimulationMirror<D>
+impl<const D: usize, T: mirror::Mirror<D> + reflect_glium::OpenGLRenderable + ?Sized> SimulationMirror<D>
     for T
 {
 }
@@ -137,9 +142,9 @@ fn run_simulation(reflection_cap: usize, json: &serde_json::Value) -> Result<(),
 
     match dim {
         2 => Simulation::<Box<dyn SimulationMirror<2>>, 2>::from_json(json)
-            .map(|sim| sim.run_opengl_3d(reflection_cap)),
+            .map(|sim| reflect_glium::run_2d(sim, reflection_cap)),
         3 => Simulation::<Box<dyn SimulationMirror<3>>, 3>::from_json(json)
-            .map(|sim| sim.run_opengl_3d(reflection_cap)),
+            .map(|sim| reflect_glium::run_3d(sim, reflection_cap)),
         _ => Err("dimension must be 2 or 3".into()),
     }
 }

@@ -524,7 +524,8 @@ checksum = "a06f77d526c1a601b7c4cdd98f54b5eaabffc14d5f2f0296febdc7f357c6d3ba"
 name = "gen_rand_sim"
 version = "0.1.0"
 dependencies = [
- "mirror_verse",
+ "reflect",
+ "reflect_mirrors",
 ]
 
 [[package]]
@@ -818,18 +819,6 @@ dependencies = [
  "log",
  "wasi",
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "mirror_verse"
-version = "0.1.0"
-dependencies = [
- "cgmath 0.18.0",
- "glium",
- "glium_shapes",
- "nalgebra",
- "rand 0.8.5",
- "serde_json",
 ]
 
 [[package]]
@@ -1297,10 +1286,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "reflect"
+version = "0.1.0"
+dependencies = [
+ "nalgebra",
+ "rand 0.8.5",
+ "serde_json",
+]
+
+[[package]]
+name = "reflect_glium"
+version = "0.1.0"
+dependencies = [
+ "cgmath 0.18.0",
+ "glium",
+ "glium_shapes",
+ "reflect",
+]
+
+[[package]]
+name = "reflect_json"
+version = "0.1.0"
+
+[[package]]
+name = "reflect_mirrors"
+version = "0.1.0"
+dependencies = [
+ "reflect",
+ "reflect_glium",
+]
+
+[[package]]
 name = "run_sim_json"
 version = "0.1.0"
 dependencies = [
- "mirror_verse",
+ "reflect",
+ "reflect_glium",
+ "reflect_mirrors",
 ]
 
 [[package]]

@@ -1,4 +1,4 @@
-use core::{array, mem, ops::Add};
+use core::array;
 
 use super::*;
 
@@ -36,24 +36,27 @@ impl<const D: usize> TryFrom<[SVector<Float, D>; D]> for PlaneMirror<D> {
 
 impl<const D: usize> PlaneMirror<D> {
     pub fn vertices(&self) -> impl Iterator<Item = SVector<Float, D>> + '_ {
-        const SHIFT: usize = mem::size_of::<Float>() * 8 - 1;
-
         let basis = self.inner_plane().basis();
-        let v_0 = *self.inner_plane().v0();
+        let v0 = *self.inner_plane().v0();
 
         (0..1 << (D - 1)).map(move |i| {
+            let mut acc = [SVector::zeros(); 2];
+
             basis
                 .iter()
                 .enumerate()
                 // returns `v` with the sign flipped if the `j`th bit in `i` is 1
-                .map(|(j, v)| Float::from_bits(i >> j << SHIFT ^ Float::to_bits(1.0)) * v)
-                .fold(v_0, Add::add)
+                .for_each(|(j, v)| acc[i >> j & 1] += v);
+
+            let [plus, minus] = acc;
+
+            v0 + plus - minus
         })
     }
 }
 
 impl<const D: usize> Mirror<D> for PlaneMirror<D> {
-    fn append_intersecting_points(&self, ray: &Ray<D>, mut list: util::List<TangentPlane<D>>) {
+    fn append_intersecting_points(&self, ray: &Ray<D>, mut list: List<TangentPlane<D>>) {
         let p = self.inner_plane();
 
         let intersection_coords = p.intersection_coordinates(ray, p.v0());
@@ -95,7 +98,7 @@ impl<const D: usize> JsonDes for PlaneMirror<D> {
             .get("center")
             .and_then(serde_json::Value::as_array)
             .map(Vec::as_slice)
-            .and_then(util::json_array_to_vector)
+            .and_then(json_array_to_vector)
             .ok_or("Failed to parse center")?;
 
         let basis_json = json
@@ -109,7 +112,7 @@ impl<const D: usize> JsonDes for PlaneMirror<D> {
             *vector = value
                 .as_array()
                 .map(Vec::as_slice)
-                .and_then(util::json_array_to_vector)
+                .and_then(json_array_to_vector)
                 .ok_or("Failed to parse basis vector")?;
         }
 
@@ -127,6 +130,7 @@ impl<const D: usize> JsonSer for PlaneMirror<D> {
             .vectors_raw()
             .each_ref()
             .map(SVector::as_slice);
+
         let (center, basis) = slices.split_first().unwrap();
 
         serde_json::json!({
@@ -139,13 +143,12 @@ impl<const D: usize> JsonSer for PlaneMirror<D> {
 impl<const D: usize> Random for PlaneMirror<D> {
     fn random(rng: &mut (impl rand::Rng + ?Sized)) -> Self {
         loop {
-            if let Some(mirror) = Self::try_new(array::from_fn(|_| util::rand_vect(rng, 10.0))) {
+            if let Some(mirror) = Self::try_new(array::from_fn(|_| rand_vect(rng, 10.0))) {
                 break mirror;
             }
         }
     }
 }
-
 
 struct PlaneRenderData<const D: usize> {
     vertices: gl::VertexBuffer<Vertex<D>>,
@@ -168,11 +171,7 @@ impl<const D: usize> RenderData for PlaneRenderData<D> {
 }
 
 impl OpenGLRenderable for PlaneMirror<2> {
-    fn append_render_data(
-        &self,
-        display: &gl::Display,
-        mut list: util::List<Box<dyn RenderData>>,
-    ) {
+    fn append_render_data(&self, display: &gl::Display, mut list: List<Box<dyn RenderData>>) {
         let vertices: Vec<_> = self.vertices().map(Vertex2D::from).collect();
 
         list.push(Box::new(PlaneRenderData {
@@ -182,11 +181,7 @@ impl OpenGLRenderable for PlaneMirror<2> {
 }
 
 impl OpenGLRenderable for PlaneMirror<3> {
-    fn append_render_data(
-        &self,
-        display: &gl::Display,
-        mut list: util::List<Box<dyn RenderData>>,
-    ) {
+    fn append_render_data(&self, display: &gl::Display, mut list: List<Box<dyn RenderData>>) {
         let vertices: Vec<_> = self.vertices().map(Vertex3D::from).collect();
 
         list.push(Box::new(PlaneRenderData {
@@ -218,7 +213,7 @@ mod tests {
         };
 
         let mut intersections = vec![];
-        mirror.append_intersecting_points(&ray, util::List::from(&mut intersections));
+        mirror.append_intersecting_points(&ray, List::from(&mut intersections));
 
         let [tangent] = intersections.as_slice() else {
             panic!("there must be one intersection");
@@ -237,7 +232,7 @@ mod tests {
 
         assert!((ray.origin - SVector::from([0., 0.])).norm().abs() < Float::EPSILON * 4.0);
         assert!(
-            (ray.direction.into_inner() - SVector::from([-1., 0.]))
+            (ray.direction.as_ref() - SVector::from([-1., 0.]))
                 .norm()
                 .abs()
                 < Float::EPSILON * 4.0
@@ -262,7 +257,7 @@ mod tests {
 
         let mut intersections = vec![];
 
-        mirror.append_intersecting_points(&ray, util::List::from(util::List::from(&mut intersections)));
+        mirror.append_intersecting_points(&ray, List::from(List::from(&mut intersections)));
 
         let [tangent] = intersections.as_slice() else {
             panic!("there must be an intersection");
@@ -281,7 +276,7 @@ mod tests {
 
         assert!((ray.origin - SVector::from([0., 0.])).norm().abs() < Float::EPSILON * 4.0);
         assert!(
-            (ray.direction.into_inner() - SVector::from([1., 0.]))
+            (ray.direction.as_ref() - SVector::from([1., 0.]))
                 .norm()
                 .abs()
                 < Float::EPSILON * 4.0
@@ -305,7 +300,7 @@ mod tests {
         };
 
         let mut intersections = vec![];
-        mirror.append_intersecting_points(&ray, util::List::from(&mut intersections));
+        mirror.append_intersecting_points(&ray, List::from(&mut intersections));
 
         let [tangent] = intersections.as_slice() else {
             panic!("there must be an intersection");
@@ -324,7 +319,7 @@ mod tests {
 
         assert!((ray.origin - SVector::from([0., 0.])).norm().abs() < Float::EPSILON * 4.0);
         assert!(
-            (ray.direction.into_inner() - SVector::from([-0.7071067811865476, 0.7071067811865476]))
+            (ray.direction.as_ref() - SVector::from([-0.7071067811865476, 0.7071067811865476]))
                 .norm()
                 .abs()
                 < Float::EPSILON * 4.0
@@ -357,8 +352,8 @@ mod tests {
         };
 
         let mut pts = vec![];
-        m1.append_intersecting_points(&ray, util::List::from(&mut pts));
-        m2.append_intersecting_points(&ray, util::List::from(&mut pts));
+        m1.append_intersecting_points(&ray, List::from(&mut pts));
+        m2.append_intersecting_points(&ray, List::from(&mut pts));
 
         let [t1, t2] = pts.as_slice() else {
             panic!("there must be an intersection");
@@ -384,7 +379,7 @@ mod tests {
 
         assert!((ray.origin - SVector::from([10., 0.5])).norm().abs() < Float::EPSILON * 4.0);
         assert!(
-            (ray.direction.into_inner() - SVector::from([-1., 0.]))
+            (ray.direction.as_ref() - SVector::from([-1., 0.]))
                 .norm()
                 .abs()
                 < Float::EPSILON * 4.0

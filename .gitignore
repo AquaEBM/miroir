@@ -1,6 +1,5 @@
 /target
-/mirror_verse/target
-/mirror_verse_json/target
 .direnv
 mirror_verse_ui/assets/run_simulation_json_3d
 mirror_verse_ui/assets/generate_random_simulation_3d
+/.vscode

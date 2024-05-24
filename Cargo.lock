@@ -303,9 +303,9 @@ dependencies = [
 
 [[package]]
 name = "crc32fast"
-version = "1.4.0"
+version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3855a8a784b474f333699ef2bbca9db2c4a1f6d9088a90a2d25b1eb53111eaa"
+checksum = "a97769d94ddab943e4510d138150169a2758b5ef3eb191a9ee688de3e23ef7b3"
 dependencies = [
  "cfg-if",
 ]
@@ -477,7 +477,7 @@ checksum = "1a5c6c585bc94aaf2c7b51dd4c2ba22680844aba4c687be581871a6f518c5742"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.64",
+ "syn 2.0.66",
 ]
 
 [[package]]
@@ -525,7 +525,9 @@ name = "gen_rand_sim"
 version = "0.1.0"
 dependencies = [
  "reflect",
+ "reflect_json",
  "reflect_mirrors",
+ "reflect_random",
 ]
 
 [[package]]
@@ -1094,9 +1096,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.82"
+version = "1.0.83"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ad3d49ab951a01fbaafe34f2ec74122942fe18a3f9814c3268f1bb72042131b"
+checksum = "0b33eb56c327dec362a9e55b3ad14f9d2f0904fb5a5b03b513ab5465399e9f43"
 dependencies = [
  "unicode-ident",
 ]
@@ -1290,8 +1292,6 @@ name = "reflect"
 version = "0.1.0"
 dependencies = [
  "nalgebra",
- "rand 0.8.5",
- "serde_json",
 ]
 
 [[package]]
@@ -1307,6 +1307,10 @@ dependencies = [
 [[package]]
 name = "reflect_json"
 version = "0.1.0"
+dependencies = [
+ "reflect",
+ "serde_json",
+]
 
 [[package]]
 name = "reflect_mirrors"
@@ -1314,6 +1318,16 @@ version = "0.1.0"
 dependencies = [
  "reflect",
  "reflect_glium",
+ "reflect_json",
+ "reflect_random",
+]
+
+[[package]]
+name = "reflect_random"
+version = "0.1.0"
+dependencies = [
+ "rand 0.8.5",
+ "reflect",
 ]
 
 [[package]]
@@ -1322,6 +1336,7 @@ version = "0.1.0"
 dependencies = [
  "reflect",
  "reflect_glium",
+ "reflect_json",
  "reflect_mirrors",
 ]
 
@@ -1396,7 +1411,7 @@ checksum = "6048858004bcff69094cd972ed40a32500f153bd3be9f716b2eed2e8217c4838"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.64",
+ "syn 2.0.66",
 ]
 
 [[package]]
@@ -1513,9 +1528,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.64"
+version = "2.0.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ad3dee41f36859875573074334c200d1add8e4a87bb37113ebd31d926b7b11f"
+checksum = "c42f3f41a2de00b01c0aaad383c5a45241efc8b2d1eda5661812fda5f3cdcff5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1545,7 +1560,7 @@ checksum = "46c3384250002a6d5af4d114f2845d37b57521033f30d5c3f46c4d70e1197533"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.64",
+ "syn 2.0.66",
 ]
 
 [[package]]
@@ -1641,7 +1656,7 @@ dependencies = [
  "once_cell",
  "proc-macro2",
  "quote",
- "syn 2.0.64",
+ "syn 2.0.66",
  "wasm-bindgen-shared",
 ]
 
@@ -1663,7 +1678,7 @@ checksum = "e94f17b526d0a461a191c78ea52bbce64071ed5c04c9ffe424dcb38f74171bb7"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.64",
+ "syn 2.0.66",
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
@@ -1769,9 +1784,9 @@ dependencies = [
 
 [[package]]
 name = "wide"
-version = "0.7.19"
+version = "0.7.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aab6594190de06d718a5dbc5fa781ab62f8903797056480e549ca74add6b7065"
+checksum = "21e005a4cc35784183a9e39cb22e9a9c46353ef6a7f113fd8d36ddc58c15ef3c"
 dependencies = [
  "bytemuck",
  "safe_arch 0.7.1",

@@ -30,7 +30,7 @@ impl<const D: usize> EuclideanSphereMirror<D> {
 }
 
 impl<const D: usize> Mirror<D> for EuclideanSphereMirror<D> {
-    fn append_intersecting_points(&self, ray: &Ray<D>, mut list: util::List<TangentPlane<D>>) {
+    fn append_intersecting_points(&self, ray: &Ray<D>, mut list: List<TangentPlane<D>>) {
         // substituting V for P + t * D in the sphere equation: ||V - C||^2 - r^2 = 0
         // results in a quadratic equation in t, solve it using the discriminant method and
         // return the vector pointing from the center of the sphere to the point of intersection
@@ -90,7 +90,7 @@ impl<const D: usize> JsonDes for EuclideanSphereMirror<D> {
             .get("center")
             .and_then(serde_json::Value::as_array)
             .map(Vec::as_slice)
-            .and_then(util::json_array_to_vector)
+            .and_then(json_array_to_vector)
             .ok_or("Failed to parse center")?;
 
         let radius = json
@@ -119,10 +119,9 @@ impl<const D: usize> Random for EuclideanSphereMirror<D> {
         const MAX_RADIUS: Float = 3.0;
 
         loop {
-            if let Some(mirror) = Self::new(
-                util::rand_vect(rng, 9.0),
-                rng.gen::<Float>() * MAX_RADIUS.abs(),
-            ) {
+            if let Some(mirror) =
+                Self::new(rand_vect(rng, 9.0), rng.gen::<Float>() * MAX_RADIUS.abs())
+            {
                 break mirror;
             }
         }
@@ -131,11 +130,7 @@ impl<const D: usize> Random for EuclideanSphereMirror<D> {
 
 // Use glium_shapes::sphere::Sphere for the 3D implementation
 impl OpenGLRenderable for EuclideanSphereMirror<3> {
-    fn append_render_data(
-        &self,
-        display: &gl::Display,
-        mut list: util::List<Box<dyn RenderData>>,
-    ) {
+    fn append_render_data(&self, display: &gl::Display, mut list: List<Box<dyn RenderData>>) {
         let r = *self.radius() as f32;
         let [x, y, z] = self.center.map(|s| s as f32).into();
 
@@ -154,11 +149,7 @@ impl OpenGLRenderable for EuclideanSphereMirror<3> {
 
 // in 2d, the list of vertices of a circle is easy to calculate
 impl OpenGLRenderable for EuclideanSphereMirror<2> {
-    fn append_render_data(
-        &self,
-        display: &gl::Display,
-        mut list: util::List<Box<dyn RenderData>>,
-    ) {
+    fn append_render_data(&self, display: &gl::Display, mut list: List<Box<dyn RenderData>>) {
         list.push(Box::new(Circle::new(
             self.center.map(|s| s as f32).into(),
             *self.radius() as f32,
@@ -186,7 +177,7 @@ mod tests {
         };
 
         let mut intersections = vec![];
-        mirror.append_intersecting_points(&ray, util::List::from(&mut intersections));
+        mirror.append_intersecting_points(&ray, List::from(&mut intersections));
 
         assert_eq!(intersections.len(), 2);
 
@@ -204,7 +195,7 @@ mod tests {
 
         assert!((ray.origin - SVector::from([-1., 0., 0.])).norm().abs() < Float::EPSILON * 4.0);
         assert!(
-            (ray.direction.into_inner() - SVector::from([-1., 0., 0.]))
+            (ray.direction.as_ref() - SVector::from([-1., 0., 0.]))
                 .norm()
                 .abs()
                 < Float::EPSILON * 4.0
@@ -225,7 +216,7 @@ mod tests {
         };
 
         let mut intersections = vec![];
-        mirror.append_intersecting_points(&ray, util::List::from(&mut intersections));
+        mirror.append_intersecting_points(&ray, List::from(&mut intersections));
 
         assert_eq!(intersections.len(), 0);
     }
@@ -244,7 +235,7 @@ mod tests {
         };
 
         let mut intersections = vec![];
-        mirror.append_intersecting_points(&ray, util::List::from(&mut intersections));
+        mirror.append_intersecting_points(&ray, List::from(&mut intersections));
 
         assert_eq!(intersections.len(), 2);
 
@@ -262,10 +253,9 @@ mod tests {
 
         assert!((ray.origin - SVector::from([-1., 0., 0.])).norm().abs() < Float::EPSILON * 4.0);
         assert!(
-            (ray.direction.into_inner()
-                - SVector::from([-0.7071067811865476, 0.7071067811865476, 0.]))
-            .norm()
-            .abs()
+            (ray.direction.as_ref() - SVector::from([-0.7071067811865476, 0.7071067811865476, 0.]))
+                .norm()
+                .abs()
                 < Float::EPSILON * 4.0
         );
     }

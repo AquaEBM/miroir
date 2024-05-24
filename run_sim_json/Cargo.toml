@@ -8,3 +8,4 @@ edition = "2021"
 reflect = { path = "../reflect" }
 reflect_glium = { path = "../reflect_glium" }
 reflect_mirrors = { path = "../reflect_mirrors" }
+reflect_json = { path = "../reflect_json" }

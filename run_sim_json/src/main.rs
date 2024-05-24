@@ -1,26 +1,17 @@
-use reflect::{
-    mirror::{
-        self,
-        JsonDes,
-        JsonType,
-    },
-    serde_json, util, Simulation,
-};
-
-use reflect_glium;
-
+use reflect::{Ray, Simulation};
+use reflect_json::{serde_json, JsonDes, JsonType};
 use reflect_mirrors::*;
 
 use std::{collections::HashMap, error::Error, format as f, fs::File, sync::OnceLock};
 
-trait SimulationMirror<const D: usize>: mirror::Mirror<D> + reflect_glium::OpenGLRenderable {}
+trait SimulationMirror<const D: usize>: reflect::Mirror<D> + reflect_glium::OpenGLRenderable {}
 
-impl<const D: usize, T: mirror::Mirror<D> + reflect_glium::OpenGLRenderable + ?Sized> SimulationMirror<D>
-    for T
+impl<const D: usize, T: reflect::Mirror<D> + reflect_glium::OpenGLRenderable + ?Sized>
+    SimulationMirror<D> for T
 {
 }
 
-impl<const D: usize> JsonType for dyn SimulationMirror<D> {
+impl<const D: usize> reflect_json::JsonType for dyn SimulationMirror<D> {
     fn json_type() -> String {
         "dynamic".into()
     }
@@ -52,13 +43,17 @@ fn deserialize_boxed<const D: usize>(
         .ok_or(f!("invalid_mirror_type: {mirror_type}"))?;
 
     if mirror_type.starts_with("[]") {
-        util::map_json_array(mirror_json, deserializer).map(boxed)
+        reflect_json::map_json_array::<_, Vec<Box<dyn SimulationMirror<D>>>>(
+            mirror_json,
+            deserializer,
+        )
+        .map(boxed)
     } else {
         deserializer(mirror_json)
     }
 }
 
-impl mirror::JsonDes for Box<dyn SimulationMirror<2>> {
+impl reflect_json::JsonDes for Box<dyn SimulationMirror<2>> {
     /// Deserialize a new 2D simulation mirror object from a JSON object.
     ///
     /// The JSON object must follow the following format:
@@ -94,7 +89,7 @@ impl mirror::JsonDes for Box<dyn SimulationMirror<2>> {
 }
 
 // copy paste lol
-impl mirror::JsonDes for Box<dyn SimulationMirror<3>> {
+impl reflect_json::JsonDes for Box<dyn SimulationMirror<3>> {
     /// Deserialize a new 3D simulation mirror object from a JSON object.
     ///
     /// The JSON object must follow the following format:
@@ -141,9 +136,9 @@ fn run_simulation(reflection_cap: usize, json: &serde_json::Value) -> Result<(),
         .ok_or(r#""dim" field must be a number"#)?;
 
     match dim {
-        2 => Simulation::<Box<dyn SimulationMirror<2>>, 2>::from_json(json)
+        2 => Simulation::<Box<dyn SimulationMirror<2>>, Vec<Ray<2>>>::from_json(json)
             .map(|sim| reflect_glium::run_2d(sim, reflection_cap)),
-        3 => Simulation::<Box<dyn SimulationMirror<3>>, 3>::from_json(json)
+        3 => Simulation::<Box<dyn SimulationMirror<3>>, Vec<Ray<3>>>::from_json(json)
             .map(|sim| reflect_glium::run_3d(sim, reflection_cap)),
         _ => Err("dimension must be 2 or 3".into()),
     }
@@ -174,7 +169,7 @@ mod tests {
     #[test]
     fn test_loop_detection() {
         let simulation =
-            Simulation::<Box<dyn SimulationMirror<3>>, 3>::from_json(&serde_json::json!(
+            Simulation::<Box<dyn SimulationMirror<3>>, Vec<Ray<3>>>::from_json(&serde_json::json!(
                 {
                     "mirror": {
                         "type": "[]plane",
@@ -207,20 +202,20 @@ mod tests {
             ))
             .unwrap();
 
-        let path = simulation.get_ray_paths(100);
-        assert!(path.first().unwrap().all_points_raw().len() == 4);
+        let mut path = simulation.get_ray_paths(100);
+        assert!(path.next().unwrap().all_points_raw().len() == 4);
     }
 
     #[test]
     fn test_no_loop_detection() {
-        let simulation = Simulation::<Box<dyn SimulationMirror<2>>, 2>::from_json(
+        let simulation = Simulation::<Box<dyn SimulationMirror<2>>, Vec<Ray<2>>>::from_json(
             &include_str!("../../assets/diamond_of_hell.json")
                 .parse()
                 .expect("invalid json in assets/diamond_of_hell.json"),
         )
         .unwrap();
 
-        let path = simulation.get_ray_paths(100);
-        assert!(path.first().unwrap().all_points_raw().len() == 101);
+        let mut path = simulation.get_ray_paths(100);
+        assert!(path.next().unwrap().all_points_raw().len() == 101);
     }
 }

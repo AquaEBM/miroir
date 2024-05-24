@@ -1,14 +1,15 @@
-mod sphere;
-mod plane;
 mod cylinder;
+mod plane;
+mod sphere;
 
-pub use sphere::*;
 pub use cylinder::*;
 pub use plane::*;
+pub use sphere::*;
 
 use reflect::*;
 use reflect_glium::*;
+use reflect_json::*;
+use reflect_random::*;
+
 use nalgebra::{SVector, Unit};
 use std::error::Error;
-
-use reflect::mirror::*;

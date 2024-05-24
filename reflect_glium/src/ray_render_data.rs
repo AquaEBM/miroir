@@ -37,8 +37,8 @@ where
 }
 
 impl RayRenderData<3> {
-    pub(crate) fn from_simulation<T: reflect::mirror::Mirror<3>>(
-        sim: &reflect::Simulation<T, 3>,
+    pub(crate) fn from_simulation<M: Mirror<3>, R: IntoIterator<Item = Ray<3>>>(
+        sim: Simulation<M, R>,
         reflection_limit: usize,
         display: &gl::Display,
     ) -> Vec<RayRenderData<3>> {
@@ -75,8 +75,8 @@ impl RayRenderData<3> {
 }
 
 impl RayRenderData<2> {
-    pub(crate) fn from_simulation<T: reflect::mirror::Mirror<2>>(
-        sim: &reflect::Simulation<T, 2>,
+    pub(crate) fn from_simulation<M: Mirror<2>, R: IntoIterator<Item = Ray<2>>>(
+        sim: Simulation<M, R>,
         reflection_limit: usize,
         display: &gl::Display,
     ) -> Vec<RayRenderData<2>> {

@@ -1,27 +1,49 @@
-# ✨ reflect ✨
+# `reflect`
 
-Light ray reflection simulation with 3D rendering.
+A minimal yet powerful library for ray reflection simulation in Rust.
 
-Built with [Rust](https://www.rust-lang.org/), using [nalgebra](https://nalgebra.org/) for general computation, and [glium](https://github.com/glium/glium) for graphical rendering.
+Requires the latest stable version of the [Rust Compiler](https://www.rust-lang.org/tools/install)
 
-GUI app built with [Flutter](https://flutter.dev/)
+Uses [nalgebra](https://nalgebra.org/) for general computation.
 
-This project is split into four main parts:
+## Crates
 
-1. 📚 The library which contains the core simulation engine, and API for creating new mirrors (`mirror_verse`).
-2. 🏃‍♂️ A program that runs a visualisation of a simulation, from it's JSON representation. (see `assets`)
-3. 🔀 A program that generates simulations randomly and serialises them to JSON files.
-4. 🖥️ A Flutter GUI app enabling users to run these tools without the terminal.
+The core of this project is the `reflect` crate, containing the main `Mirror` trait and simulation logic
 
-## GUI
+The `reflect_mirrors` crate contains several example implementations of reflective surfaces that can be used in simulations. This is where you should look if you need an example of how to implement your own custom mirror shapes.
 
-First, make sure you have [Rust](https://www.rust-lang.org/) and [Flutter](https://flutter.dev/) installed on your machine.
+There are integrations extending this library with more functionality such as:
 
-### 🛠️ Compilation
+- `reflect_glium` Which enables running and visualising 2D and 3D simulations using OpenGL.
+- `reflect_json` Which enables serialisation/deserialisation of simulation data with the JSON format. Some example simulations in their JSON representation can be found in the `assets` directory.
+- `reflect_random` Which exposes a simple trait for generating reflective surfaces randomly, for
+quick and dirty testing.
 
-Build the Rust project and move the emitted executables into the Flutter project's `assets` directory:
+Other third-party integrations, can easily be created over the simple API of the `reflect` crate. It is advised to check it's documentation:
 
-#### Windows
+```shell
+cargo doc -p reflect --no-deps --open
+```
+
+The binary crate `gen_rand_sim` can generate random simulations and serialise to json, using `reflect_json` and `reflect_random`:
+
+```shell
+cargo run -r -p gen_rand_sim "<path/to/file.json>" [dimensions=2] [num_mirrors=12] [num_rays=4]
+```
+
+The binary crate `run_sim_json` can deserialise, run, then view simulations using `reflect_glium` and `reflect_json`:
+
+```shell
+cargo run -r -p run_sim_json "<path/to/simulation.json>" [max_reflection_count=1000]
+```
+
+## Flutter GUI App
+
+The `mirror_verse_ui` GUI App, built with [Flutter](https://flutter.dev/), serves as a simple way to view simulation JSON files, run them with `run_sim_json`, as well as generate them randomly with `gen_rand_sim`, all in one single place. Here's how to run it:
+
+First, build the executables and move them to the Flutter `assets` folder:
+
+- Windows:
 
 ```shell
 cargo build -r
@@ -29,7 +51,7 @@ copy "target\release\generate_random_simulation_3d.exe mirror_verse_ui\assets"
 copy "target\release\run_simulation_json_3d.exe mirror_verse_ui\assets"
 ```
 
-#### For Linux/MacOS
+- Linux/MacOS
 
 ```shell
 cargo build -r && \
@@ -37,58 +59,19 @@ cp target/release/generate_random_simulation_3d mirror_verse_ui/assets && \
 cp target/release/run_simulation_json_3d mirror_verse_ui/assets
 ```
 
-### 🚀 Running the UI
+You can now run the app with:
 
 ```shell
 cd mirror_verse_ui
 flutter run --release
 ```
 
-## CLI
+### Controls for `reflect_glium`
 
-Installing [Flutter](https://flutter.dev/) is not necessary to run/generate simulations from the command line.
+The `reflect_glium` binary crate (which is run by the `mirror_verse_ui`) allows viewing simulations where you can move around and rotate the camera. Here are the controls:
 
-### 🔬 Running a simulation from a JSON file
-
-```shell
-cargo run --release -p run_sim_json "<path/to/simulation.json>" [max_reflection_count]
-```
-
-#### Controls
-
-You can use the following controls during the visualisation of a simulation:
-
-- Use the ZQSD keys (or WASD) to move forward, backward, left, and right, respectively.
+- Use the WASD keys (or ZQSD) to move forward, left, backward, and right, respectively.
 - Use the space bar to move up and the shift key to move down.
 - Click and drag your mouse on the screen to look around, and rotate the camera.
 - Use the right/left arrow key to increase/decrease camera movement sensitivity.
 - Use the up/down key to increase/decrease physical movement speed.
-
-### 🔄 Generating a random simulation
-
-```shell
-cargo run --release -p gen_rand_sim "<path/to/output.json>" [dimension, default=2] [num_mirrors, default=12] [num_rays, default=4]
-```
-
-## Contributing
-
-There are many ways to contribute to this project:
-
-- Creating unit tests
-- Adding documentation
-- Raising an issue on Github for bugfixes or suggestions
-- Adding new mirror shapes to the library!
-
-### Implementing new Mirror Shapes
-
-First, it is advised to check the documentation, specifically the `mirror_verse` module, using:
-
-```shell
-cargo doc --no-deps -p mirror_verse --open
-```
-
-Most mirror implementations, with all of their functionalities, are simple and compact (< 200 sloc), so you can easily browse the already implemented mirrors in the `mirror_verse/src/mirror` directory, if you need examples.
-
-## Note
-
-This project is currently undergoing (yet another hehe) major refactor, in which the core `Mirror` trait and simulation engine will be seperated into their own crate `mirror_verse` from other exposed functionalities, that will, then, be seen as extensions/integrations, in order to allow other users to seemlessly extend this crate into the broader Rust ecosystem.

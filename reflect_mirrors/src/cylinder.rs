@@ -22,7 +22,7 @@ impl CylindricalMirror {
         (dist_sq.sqrt() > E && r_abs > E).then(|| Self {
             start,
             dist,
-            radius,
+            radius: r_abs,
             radius_sq: radius * radius,
             inv_norm_dist_squared: dist_sq.recip(),
         })
@@ -39,10 +39,21 @@ impl CylindricalMirror {
     pub fn radius(&self) -> Float {
         self.radius
     }
+
+    pub fn set_radius(&mut self, radius: Float) -> bool {
+        let r_abs = radius.abs();
+        let ok = r_abs > Float::EPSILON * 16.0;
+
+        if ok {
+            self.radius = r_abs;
+        }
+
+        ok
+    }
 }
 
 impl Mirror<3> for CylindricalMirror {
-    fn append_intersecting_points(&self, ray: &Ray<3>, mut list: util::List<TangentPlane<3>>) {
+    fn append_intersecting_points(&self, ray: &Ray<3>, mut list: List<TangentPlane<3>>) {
         let line_coord = |v| self.dist.dot(&v) * self.inv_norm_dist_squared;
         let p = |v| line_coord(v) * self.dist;
 
@@ -107,14 +118,14 @@ impl JsonDes for CylindricalMirror {
             .get("start")
             .and_then(serde_json::Value::as_array)
             .map(Vec::as_slice)
-            .and_then(util::json_array_to_vector)
+            .and_then(json_array_to_vector)
             .ok_or("Failed to parse start")?;
 
         let end = json
             .get("end")
             .and_then(serde_json::Value::as_array)
             .map(Vec::as_slice)
-            .and_then(util::json_array_to_vector)
+            .and_then(json_array_to_vector)
             .ok_or("Failed to parse end")?;
 
         let radius = json
@@ -150,7 +161,7 @@ impl Random for CylindricalMirror {
     {
         loop {
             if let Some(mirror) = Self::new(
-                [util::rand_vect(rng, 10.0), util::rand_vect(rng, 10.0)],
+                [rand_vect(rng, 10.0), rand_vect(rng, 10.0)],
                 rng.gen::<Float>() * 4.0,
             ) {
                 break mirror;
@@ -176,11 +187,7 @@ impl RenderData for CylinderRenderData {
 }
 
 impl OpenGLRenderable for CylindricalMirror {
-    fn append_render_data(
-        &self,
-        display: &gl::Display,
-        mut list: util::List<Box<dyn RenderData>>,
-    ) {
+    fn append_render_data(&self, display: &gl::Display, mut list: List<Box<dyn RenderData>>) {
         const NUM_POINTS: usize = 360;
 
         let d = self.segment_length().map(|s| s as f32);

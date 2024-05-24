@@ -1,6 +1,6 @@
 use core::ops::Deref;
 extern crate alloc;
-use alloc::{sync::Arc, rc::Rc};
+use alloc::{rc::Rc, sync::Arc};
 use std::time;
 
 use cgmath as cg;
@@ -8,7 +8,8 @@ pub use glium as gl;
 pub use glium_shapes as gl_shapes;
 
 use gl::glutin;
-use reflect::{nalgebra, util::List};
+use nalgebra as na;
+use reflect::*;
 
 mod camera;
 mod ray_render_data;
@@ -24,19 +25,19 @@ pub struct Vertex<const N: usize> {
 }
 
 pub type Vertex2D = Vertex<2>;
-glium::implement_vertex!(Vertex2D, position);
+gl::implement_vertex!(Vertex2D, position);
 
 pub type Vertex3D = Vertex<3>;
-glium::implement_vertex!(Vertex3D, position);
+gl::implement_vertex!(Vertex3D, position);
 
-impl<const D: usize> From<nalgebra::SVector<f32, D>> for Vertex<D> {
-    fn from(v: nalgebra::SVector<f32, D>) -> Self {
+impl<const D: usize> From<na::SVector<f32, D>> for Vertex<D> {
+    fn from(v: na::SVector<f32, D>) -> Self {
         Self { position: v.into() }
     }
 }
 
-impl<const D: usize> From<nalgebra::SVector<f64, D>> for Vertex<D> {
-    fn from(v: nalgebra::SVector<f64, D>) -> Self {
+impl<const D: usize> From<na::SVector<f64, D>> for Vertex<D> {
+    fn from(v: na::SVector<f64, D>) -> Self {
         Self {
             position: v.map(|s| s as f32).into(),
         }
@@ -44,7 +45,6 @@ impl<const D: usize> From<nalgebra::SVector<f64, D>> for Vertex<D> {
 }
 
 fn default_display_event_loop() -> (glutin::event_loop::EventLoop<()>, gl::Display) {
-
     const DEFAULT_WIDTH: u32 = 1280;
     const DEFAULT_HEIGHT: u32 = 720;
 
@@ -56,33 +56,31 @@ fn default_display_event_loop() -> (glutin::event_loop::EventLoop<()>, gl::Displ
         glutin::ContextBuilder::new()
             .with_vsync(true)
             .with_multisampling(1 << 8),
-            &el
-    ).expect("failed to build display");
-
-    (
-        el,
-        display,
+        &el,
     )
+    .expect("failed to build display");
+
+    (el, display)
 }
 
-pub fn run_2d<T: reflect::mirror::Mirror<2> + OpenGLRenderable>(
-    sim: reflect::Simulation<T, 2>,
+pub fn run_2d<M: Mirror<2> + OpenGLRenderable, R: IntoIterator<Item = Ray<2>>>(
+    sim: Simulation<M, R>,
     reflection_limit: usize,
 ) {
     let (el, display) = default_display_event_loop();
 
-    let drawable_simulation = SimRenderData::<2>::from_simulation(&sim, reflection_limit, &display);
+    let drawable_simulation = SimRenderData::<2>::from_simulation(sim, reflection_limit, &display);
 
     drawable_simulation.run(display, el);
 }
 
-pub fn run_3d<T: reflect::mirror::Mirror<3> + OpenGLRenderable>(
-    sim: reflect::Simulation<T, 3>,
+pub fn run_3d<M: Mirror<3> + OpenGLRenderable, R: IntoIterator<Item = Ray<3>>>(
+    sim: Simulation<M, R>,
     reflection_limit: usize,
 ) {
     let (el, display) = default_display_event_loop();
 
-    let drawable_simulation = SimRenderData::<3>::from_simulation(&sim, reflection_limit, &display);
+    let drawable_simulation = SimRenderData::<3>::from_simulation(sim, reflection_limit, &display);
 
     drawable_simulation.run(display, el);
 }
@@ -122,6 +120,12 @@ impl<T: OpenGLRenderable> OpenGLRenderable for [T] {
     }
 }
 
+impl<const N: usize, T: OpenGLRenderable> OpenGLRenderable for [T; N] {
+    fn append_render_data(&self, display: &glium::Display, list: List<Box<dyn RenderData>>) {
+        self.as_slice().append_render_data(display, list)
+    }
+}
+
 // It's clear that all these impls use the `Deref` trait, but writing a blanket impl over all types implementing `Deref`
 // makes the trait unusable downstream
 
@@ -138,25 +142,25 @@ impl<T: OpenGLRenderable + ?Sized> OpenGLRenderable for Arc<T> {
 }
 
 impl<T: OpenGLRenderable + ?Sized> OpenGLRenderable for Rc<T> {
-    fn append_render_data(&self, display: &glium::Display, list: List<Box<dyn RenderData>>) {
+    fn append_render_data(&self, display: &gl::Display, list: List<Box<dyn RenderData>>) {
         self.deref().append_render_data(display, list)
     }
 }
 
 impl<T: OpenGLRenderable> OpenGLRenderable for Vec<T> {
-    fn append_render_data(&self, display: &glium::Display, list: List<Box<dyn RenderData>>) {
+    fn append_render_data(&self, display: &gl::Display, list: List<Box<dyn RenderData>>) {
         self.deref().append_render_data(display, list)
     }
 }
 
 impl<'a, T: OpenGLRenderable + ?Sized> OpenGLRenderable for &'a T {
-    fn append_render_data(&self, display: &glium::Display, list: List<Box<dyn RenderData>>) {
+    fn append_render_data(&self, display: &gl::Display, list: List<Box<dyn RenderData>>) {
         (*self).append_render_data(display, list)
     }
 }
 
 impl<'a, T: OpenGLRenderable + ?Sized> OpenGLRenderable for &'a mut T {
-    fn append_render_data(&self, display: &glium::Display, list: List<Box<dyn RenderData>>) {
+    fn append_render_data(&self, display: &gl::Display, list: List<Box<dyn RenderData>>) {
         self.deref().append_render_data(display, list)
     }
 }
@@ -169,14 +173,14 @@ impl Circle {
     pub fn new(center: [f32; 2], radius: f32, display: &gl::Display) -> Self {
         const NUM_POINTS: usize = 360;
 
-        let c = nalgebra::SVector::from(center);
+        let c = na::SVector::from(center);
 
         use core::f32::consts::TAU;
 
         let points: Vec<Vertex2D> = (0..NUM_POINTS)
             .map(|i| {
                 let pos: [f32; 2] = (i as f32 / NUM_POINTS as f32 * TAU).sin_cos().into();
-                (nalgebra::SVector::from(pos) * radius + c).into()
+                (na::SVector::from(pos) * radius + c).into()
             })
             .collect();
 

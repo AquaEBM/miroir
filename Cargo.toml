@@ -5,7 +5,7 @@ members = [
     "reflect",
     "reflect_glium",
     "reflect_json",
-    "reflect_mirrors", 
+    "reflect_mirrors", "reflect_random", 
     "run_sim_json"
 ]
 

@@ -1,30 +1,28 @@
 use core::{iter, ops::Deref};
 use std::{env, error::Error, fs::File};
 
-use reflect::{
-    mirror::{self, JsonSer, Random},
-    rand, serde_json, Simulation,
-};
-
+use reflect::Simulation;
+use reflect_json::{serde_json, JsonSer};
 use reflect_mirrors::*;
+use reflect_random::*;
 
 trait JsonTypeDyn {
     fn json_type_dyn(&self) -> String;
 }
 
-impl<T: mirror::JsonType + ?Sized> JsonTypeDyn for T {
+impl<T: reflect_json::JsonType + ?Sized> JsonTypeDyn for T {
     fn json_type_dyn(&self) -> String {
         Self::json_type()
     }
 }
 
-trait JsonSerDyn: mirror::JsonSer + JsonTypeDyn {}
+trait JsonSerDyn: JsonSer + JsonTypeDyn {}
 
-impl<T: mirror::JsonSer + JsonTypeDyn> JsonSerDyn for T {}
+impl<T: JsonSer + JsonTypeDyn> JsonSerDyn for T {}
 
 struct Dynamic<T, const D: usize>(T);
 
-impl mirror::Random for Dynamic<Box<dyn JsonSerDyn>, 2> {
+impl Random for Dynamic<Box<dyn JsonSerDyn>, 2> {
     fn random(rng: &mut (impl rand::Rng + ?Sized)) -> Self {
         Self(match rng.gen_range(0usize..2) {
             0 => Box::new(PlaneMirror::<2>::random(rng)) as Box<dyn JsonSerDyn>,
@@ -34,7 +32,7 @@ impl mirror::Random for Dynamic<Box<dyn JsonSerDyn>, 2> {
     }
 }
 
-impl mirror::Random for Dynamic<Box<dyn JsonSerDyn>, 3> {
+impl Random for Dynamic<Box<dyn JsonSerDyn>, 3> {
     fn random(rng: &mut (impl rand::Rng + ?Sized)) -> Self {
         Self(match rng.gen_range(0usize..3) {
             0 => Box::new(PlaneMirror::<3>::random(rng)) as Box<dyn JsonSerDyn>,
@@ -45,9 +43,9 @@ impl mirror::Random for Dynamic<Box<dyn JsonSerDyn>, 3> {
     }
 }
 
-impl<T: Deref, const D: usize> mirror::JsonSer for Dynamic<T, D>
+impl<T: Deref, const D: usize> JsonSer for Dynamic<T, D>
 where
-    T::Target: JsonTypeDyn + mirror::JsonSer,
+    T::Target: JsonTypeDyn + JsonSer,
 {
     fn to_json(&self) -> serde_json::Value {
         serde_json::json!({
@@ -57,16 +55,13 @@ where
     }
 }
 
-impl<T, const D: usize> mirror::JsonType for Dynamic<T, D> {
+impl<T, const D: usize> reflect_json::JsonType for Dynamic<T, D> {
     fn json_type() -> String {
         "dynamic".into()
     }
 }
 
-pub fn gen_rand_mirrors<T: mirror::Random>(
-    n: usize,
-    rng: &mut (impl rand::Rng + ?Sized),
-) -> Vec<T> {
+pub fn gen_rand_mirrors<T: Random>(n: usize, rng: &mut (impl rand::Rng + ?Sized)) -> Vec<T> {
     iter::repeat_with(|| T::random(rng)).take(n).collect()
 }
 
@@ -82,7 +77,7 @@ fn generate_random_simulation(
                 num_mirrors,
                 &mut rng,
             )),
-            rays: iter::repeat_with(|| mirror::Ray::<2>::random(&mut rng))
+            rays: iter::repeat_with(|| reflect::Ray::<2>::random(&mut rng))
                 .take(num_rays)
                 .collect(),
         }
@@ -93,7 +88,7 @@ fn generate_random_simulation(
                 num_mirrors,
                 &mut rng,
             )),
-            rays: iter::repeat_with(|| mirror::Ray::<3>::random(&mut rng))
+            rays: iter::repeat_with(|| reflect::Ray::<3>::random(&mut rng))
                 .take(num_rays)
                 .collect(),
         }

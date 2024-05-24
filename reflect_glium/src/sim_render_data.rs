@@ -39,8 +39,11 @@ const FRAGMENT_SHADER_SRC: &str = r#"
 "#;
 
 impl SimRenderData<3> {
-    pub(crate) fn from_simulation<T: reflect::mirror::Mirror<3> + OpenGLRenderable>(
-        sim: &reflect::Simulation<T, 3>,
+    pub(crate) fn from_simulation<
+        M: Mirror<3> + OpenGLRenderable,
+        R: IntoIterator<Item = Ray<3>>,
+    >(
+        sim: Simulation<M, R>,
         reflection_limit: usize,
         display: &gl::Display,
     ) -> Self {
@@ -63,7 +66,7 @@ impl SimRenderData<3> {
         let mut render_data = vec![];
 
         sim.mirror
-            .append_render_data(display, reflect::util::List::from(&mut render_data));
+            .append_render_data(display, List::from(&mut render_data));
 
         Self::new(
             RayRenderData::<3>::from_simulation(sim, reflection_limit, display),
@@ -74,8 +77,11 @@ impl SimRenderData<3> {
 }
 
 impl SimRenderData<2> {
-    pub(crate) fn from_simulation<T: reflect::mirror::Mirror<2> + OpenGLRenderable>(
-        sim: &reflect::Simulation<T, 2>,
+    pub(crate) fn from_simulation<
+        M: Mirror<2> + OpenGLRenderable,
+        R: IntoIterator<Item = Ray<2>>,
+    >(
+        sim: Simulation<M, R>,
         reflection_limit: usize,
         display: &gl::Display,
     ) -> Self {
@@ -98,7 +104,7 @@ impl SimRenderData<2> {
         let mut render_data = vec![];
 
         sim.mirror
-            .append_render_data(display, reflect::util::List::from(&mut render_data));
+            .append_render_data(display, List::from(&mut render_data));
 
         Self::new(
             RayRenderData::<2>::from_simulation(sim, reflection_limit, display),

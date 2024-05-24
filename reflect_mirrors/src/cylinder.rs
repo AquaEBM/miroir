@@ -28,7 +28,7 @@ impl CylindricalMirror {
         })
     }
 
-    pub fn segment_length(&self) -> SVector<Float, 3> {
+    pub fn segment_dist(&self) -> SVector<Float, 3> {
         self.dist
     }
 
@@ -190,15 +190,18 @@ impl OpenGLRenderable for CylindricalMirror {
     fn append_render_data(&self, display: &gl::Display, mut list: List<Box<dyn RenderData>>) {
         const NUM_POINTS: usize = 360;
 
-        let d = self.segment_length().map(|s| s as f32);
+        let d = self.segment_dist().map(|s| s as f32);
 
-        let k = nalgebra::SVector::from([0.0, 0.0, 1.0]) + d.normalize();
+        let b = d.normalize();
 
-        // outer product of d and k
-        let m = nalgebra::SMatrix::<_, 3, 3>::from_fn(|i, j| k[i] * k[j]);
+        let k = nalgebra::SVector::from([0.0, 0.0, 1.0]) + b;
 
-        // rotation matrix to rotate the circle so it faces the axis formed by our line segment
-        let rot = 2.0 / k.norm_squared() * m - nalgebra::SMatrix::identity();
+        // Rotation matrix to rotate the circle so it faces the axis formed by our line segment
+        // specifically it is the orthogonal matrix that maps the unit `z` vector `a = [0, 0, 1]`
+        // to `b`, let `v = a + b`, let `O = (v * vT) / (vT * v) or v ⊗ v / <v, v>`
+        // (outer product divided by the inner product)
+        // Then, `R = 2 * O - Id`
+        let rot = 2.0 / k.norm_squared() * k.kronecker(&k.transpose()) - nalgebra::SMatrix::identity();
 
         let r = self.radius() as f32;
         let start = self.line_segment()[0].map(|s| s as f32);

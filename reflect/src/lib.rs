@@ -1,9 +1,10 @@
+#![no_std]
+
 extern crate alloc;
 
-use alloc::{collections::TryReserveError, rc::Rc, sync::Arc};
+use alloc::{collections::TryReserveError, rc::Rc, sync::Arc, vec::Vec, boxed::Box};
 use core::ops::Deref;
 
-// re-export deps for convenience
 pub use nalgebra;
 
 use nalgebra::{SMatrix, SVector, Unit};
@@ -491,7 +492,7 @@ pub struct Simulation<M, R> {
 
 impl<const D: usize, M: Mirror<D>, R: IntoIterator<Item = Ray<D>>> Simulation<M, R> {
     pub fn get_ray_paths(self, reflection_limit: usize) -> impl Iterator<Item = RayPath<D>> {
-        let mut intersections_scratch = vec![];
+        let mut intersections_scratch = Vec::new();
         self.rays.into_iter().map(move |mut ray| {
             let mut ray_path = RayPath::default();
             ray_path.push_point(ray.origin);

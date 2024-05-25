@@ -15,42 +15,52 @@ pub type Float = f64;
 pub struct List<'a, T>(&'a mut Vec<T>);
 
 impl<'a, T> List<'a, T> {
+    #[inline]
     pub fn reborrow(&mut self) -> List<T> {
         List(self.0)
     }
 
+    #[inline]
     pub fn new(list: &'a mut Vec<T>) -> Self {
         Self(list)
     }
 
+    #[inline]
     pub fn capacity(&self) -> usize {
         self.0.capacity()
     }
 
+    #[inline]
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
         self.0.try_reserve(additional)
     }
 
+    #[inline]
     pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), TryReserveError> {
         self.0.try_reserve_exact(additional)
     }
 
+    #[inline]
     pub fn reserve(&mut self, additional: usize) {
         self.0.reserve(additional)
     }
 
+    #[inline]
     pub fn reserve_exact(&mut self, additional: usize) {
         self.0.reserve_exact(additional)
     }
 
+    #[inline]
     pub fn push(&mut self, v: T) {
         self.0.push(v)
     }
 
+    #[inline]
     pub fn append(&mut self, vec: &mut Vec<T>) {
         self.0.append(vec)
     }
 
+    #[inline]
     pub fn extend_from_slice(&mut self, slice: &[T])
     where
         T: Clone,
@@ -60,12 +70,15 @@ impl<'a, T> List<'a, T> {
 }
 
 impl<'a, T> Extend<T> for List<'a, T> {
+
+    #[inline]
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         self.0.extend(iter)
     }
 }
 
 impl<'a, T> From<&'a mut Vec<T>> for List<'a, T> {
+    #[inline]
     fn from(value: &'a mut Vec<T>) -> Self {
         Self(value)
     }
@@ -82,16 +95,19 @@ pub struct Ray<const D: usize> {
 
 impl<const D: usize> Ray<D> {
     /// Reflect the ray's direction with respect to the given hyperplane
+    #[inline]
     pub fn reflect_dir(&mut self, tangent: &TangentSpace<D>) {
         self.direction = tangent.reflect_unit(self.direction);
     }
 
     /// Move the ray's position forward (or backward if t < 0.0) by `t`
+    #[inline]
     pub fn advance(&mut self, t: Float) {
         self.origin += t * self.direction.as_ref();
     }
 
     /// Get the point at distance `t` (can be negative) from the ray's origin
+    #[inline]
     pub fn at(&self, t: Float) -> SVector<Float, D> {
         self.origin + self.direction.as_ref() * t
     }
@@ -112,6 +128,7 @@ impl<const D: usize> AffineHyperPlane<D> {
     /// Returns `None` if the provided family isn't free.
     ///
     /// Note that an expression like `[T ; N - 1]` is locked under `#[feature(const_generic_exprs)]`.
+    #[inline]
     pub fn new(vectors: [SVector<Float, D>; D]) -> Option<(Self, AffineHyperPlaneOrtho<D>)> {
         let mut orthonormalized = vectors;
         (SVector::orthonormalize(&mut orthonormalized[1..]) == D - 1).then_some((
@@ -123,11 +140,13 @@ impl<const D: usize> AffineHyperPlane<D> {
     }
 
     /// A reference to the plane's starting point
+    #[inline]
     pub fn v0(&self) -> &SVector<Float, D> {
         self.vectors.first().unwrap()
     }
 
     /// A mutable reference to the plane's starting point
+    #[inline]
     pub fn v0_mut(&mut self) -> &mut SVector<Float, D> {
         &mut self.vectors[0]
     }
@@ -135,10 +154,12 @@ impl<const D: usize> AffineHyperPlane<D> {
     /// A reference to the basis of the plane's direction hyperplane.
     ///
     /// The returned slice is garanteed to be of length `D - 1`.
+    #[inline]
     pub fn basis(&self) -> &[SVector<Float, D>] {
         &self.vectors[1..]
     }
 
+    #[inline]
     pub fn vectors_raw(&self) -> &[SVector<Float, D>; D] {
         &self.vectors
     }
@@ -153,6 +174,7 @@ impl<const D: usize> AffineHyperPlane<D> {
     /// let `[v_2, ..., v_d]` be the basis of `self`'s direction space (returned by `self.basis()`)
     ///
     /// `interserction = plane.origin + sum for k in [2 ; n] t_k * v_k`
+    #[inline]
     pub fn intersection_coordinates(
         &self,
         ray: &Ray<D>,
@@ -182,11 +204,13 @@ pub struct AffineHyperPlaneOrtho<const D: usize> {
 
 impl<const D: usize> AffineHyperPlaneOrtho<D> {
     /// A reference to the plane's starting point
+    #[inline]
     pub fn v0(&self) -> &SVector<Float, D> {
         self.vectors.first().unwrap()
     }
 
     /// A mutable reference to the plane's starting point
+    #[inline]
     pub fn v0_mut(&mut self) -> &mut SVector<Float, D> {
         &mut self.vectors[0]
     }
@@ -194,16 +218,19 @@ impl<const D: usize> AffineHyperPlaneOrtho<D> {
     /// A reference to an orthonormal basis of the plane's direction hyperplane.
     ///
     /// The returned slice is garanteed to be of length `D - 1`.
+    #[inline]
     pub fn basis(&self) -> &[SVector<Float, D>] {
         &self.vectors[1..]
     }
 
     /// Returns the orthogonal projection of `v` w.r.t. this plane's direction subspace.
+    #[inline]
     pub fn orthogonal_projection(&self, v: SVector<Float, D>) -> SVector<Float, D> {
         self.basis().iter().map(|e| v.dot(e) * e).sum()
     }
 
     /// Returns the point in this plane whose distance with `p` is smallest.
+    #[inline]
     pub fn orthogonal_point_projection(&self, p: SVector<Float, D>) -> SVector<Float, D> {
         let v0 = self.v0();
         let v = p - v0;
@@ -220,6 +247,7 @@ impl<const D: usize> AffineHyperPlaneOrtho<D> {
     /// let `[v_2, ..., v_d]` be the orthonormal basis of `self`'s direction space ( returned by `self.basis()`)
     ///
     /// `interserction = plane.origin + sum for k in [2 ; n] t_k * v_k`
+    #[inline]
     pub fn intersection_coordinates(
         &self,
         ray: &Ray<D>,
@@ -251,6 +279,7 @@ pub enum TangentSpace<const D: usize> {
 
 impl<const D: usize> TangentSpace<D> {
     /// Reflect a vector w.r.t this hyperplane
+    #[inline]
     pub fn reflect(&self, v: SVector<Float, D>) -> SVector<Float, D> {
         match self {
             TangentSpace::Plane(plane) => 2.0 * plane.orthogonal_projection(v) - v,
@@ -262,6 +291,7 @@ impl<const D: usize> TangentSpace<D> {
     }
 
     /// Reflect a unit vector w.r.t. this hyperplane
+    #[inline]
     pub fn reflect_unit(&self, v: Unit<SVector<Float, D>>) -> Unit<SVector<Float, D>> {
         // SAFETY: orthogonal symmetry preserves euclidean norms
         // This function is supposed to be unsafe, why nalgebra? why?
@@ -272,6 +302,7 @@ impl<const D: usize> TangentSpace<D> {
     /// whose direction space is `self`, and whose starting point is `p`.
     ///
     /// Returns `None` if `ray` is parallel to `self`
+    #[inline]
     pub fn try_ray_intersection(&self, p: &SVector<Float, D>, ray: &Ray<D>) -> Option<Float> {
         match self {
             TangentSpace::Plane(plane) => plane.intersection_coordinates(ray, p).map(|v| v[0]),
@@ -305,11 +336,13 @@ pub struct TangentPlane<const D: usize> {
 
 impl<const D: usize> TangentPlane<D> {
     /// Reflect a vector w.r.t this tangent plane's direction hyperplane
+    #[inline]
     pub fn reflect(&self, v: SVector<Float, D>) -> SVector<Float, D> {
         self.direction.reflect(v)
     }
 
     /// Reflect a unit vector w.r.t. this tangent plane's direction hyperplane
+    #[inline]
     pub fn reflect_unit(&self, v: Unit<SVector<Float, D>>) -> Unit<SVector<Float, D>> {
         self.direction.reflect_unit(v)
     }
@@ -317,6 +350,7 @@ impl<const D: usize> TangentPlane<D> {
     /// Return the distance `t` such that `ray.at(t)` intersects with this tangent plane
     ///
     /// Returns `None` if `ray` is parallel to `self`
+    #[inline]
     pub fn try_ray_intersection(&self, ray: &Ray<D>) -> Option<Float> {
         match &self.intersection {
             Intersection::Distance(t) => Some(*t),
@@ -362,6 +396,7 @@ pub trait Mirror<const D: usize> {
 }
 
 impl<const D: usize, T: Mirror<D>> Mirror<D> for [T] {
+    #[inline]
     fn append_intersecting_points(&self, ray: &Ray<D>, mut list: List<TangentPlane<D>>) {
         self.iter()
             .for_each(|mirror| mirror.append_intersecting_points(ray, list.reborrow()))
@@ -369,6 +404,7 @@ impl<const D: usize, T: Mirror<D>> Mirror<D> for [T] {
 }
 
 impl<const N: usize, const D: usize, T: Mirror<D>> Mirror<D> for [T; N] {
+    #[inline]
     fn append_intersecting_points(&self, ray: &Ray<D>, list: List<TangentPlane<D>>) {
         self.as_slice().append_intersecting_points(ray, list)
     }
@@ -378,36 +414,42 @@ impl<const N: usize, const D: usize, T: Mirror<D>> Mirror<D> for [T; N] {
 // makes the trait unusable downstream
 
 impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Box<T> {
+    #[inline]
     fn append_intersecting_points(&self, ray: &Ray<D>, list: List<TangentPlane<D>>) {
         self.deref().append_intersecting_points(ray, list)
     }
 }
 
 impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Arc<T> {
+    #[inline]
     fn append_intersecting_points(&self, ray: &Ray<D>, list: List<TangentPlane<D>>) {
         self.deref().append_intersecting_points(ray, list)
     }
 }
 
 impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Rc<T> {
+    #[inline]
     fn append_intersecting_points(&self, ray: &Ray<D>, list: List<TangentPlane<D>>) {
         self.deref().append_intersecting_points(ray, list)
     }
 }
 
 impl<const D: usize, T: Mirror<D>> Mirror<D> for Vec<T> {
+    #[inline]
     fn append_intersecting_points(&self, ray: &Ray<D>, list: List<TangentPlane<D>>) {
         self.deref().append_intersecting_points(ray, list)
     }
 }
 
 impl<'a, const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for &'a T {
+    #[inline]
     fn append_intersecting_points(&self, ray: &Ray<D>, list: List<TangentPlane<D>>) {
         (*self).append_intersecting_points(ray, list)
     }
 }
 
 impl<'a, const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for &'a mut T {
+    #[inline]
     fn append_intersecting_points(&self, ray: &Ray<D>, list: List<TangentPlane<D>>) {
         self.deref().append_intersecting_points(ray, list)
     }
@@ -421,35 +463,42 @@ pub struct RayPath<const D: usize> {
 }
 
 impl<const D: usize> RayPath<D> {
+    #[inline]
     pub fn all_points_raw(&self) -> &[SVector<Float, D>] {
         self.points.as_slice()
     }
 
+    #[inline]
     /// returns a pair (non_loop_points, loop_points)
     pub fn all_points(&self) -> (&[SVector<Float, D>], &[SVector<Float, D>]) {
         self.points
             .split_at(self.loop_start.unwrap_or(self.points.len()))
     }
 
+    #[inline]
     // name bikeshedding welcome
     pub fn non_loop_points(&self) -> &[SVector<Float, D>] {
         &self.points[..self.loop_start.unwrap_or(self.points.len())]
     }
 
+    #[inline]
     pub fn loop_points(&self) -> &[SVector<Float, D>] {
         self.loop_start
             .map(|index| &self.points[index..])
             .unwrap_or_default()
     }
 
+    #[inline]
     pub fn divergence_direction(&self) -> Option<&Unit<SVector<Float, D>>> {
         self.divergence_direction.as_ref()
     }
 
+    #[inline]
     pub fn push_point(&mut self, pt: SVector<Float, D>) {
         self.points.push(pt);
     }
 
+    #[inline]
     pub fn causes_loop_at(&self, pt: SVector<Float, D>, epsilon: Float) -> Option<usize> {
         self.points.split_last().and_then(|(last_pt, points)| {
             points.windows(2).enumerate().find_map(|(i, window)| {
@@ -466,6 +515,7 @@ impl<const D: usize> RayPath<D> {
 
     /// Attempts to push a point to the path. If it causes an infinite loop, aborts,
     /// registers the section of the path that loops, and returns `false`
+    #[inline]
     pub fn try_push_point(&mut self, pt: SVector<Float, D>, epsilon: Float) -> bool {
         let maybe_loop_index = self.causes_loop_at(pt, epsilon);
 
@@ -478,6 +528,7 @@ impl<const D: usize> RayPath<D> {
         maybe_loop_index.is_none()
     }
 
+    #[inline]
     pub fn set_divergence_direction(&mut self, dir: Unit<SVector<Float, D>>) -> bool {
         let first_time = self.divergence_direction.is_none();
         self.divergence_direction = Some(dir);
@@ -491,6 +542,7 @@ pub struct Simulation<M, R> {
 }
 
 impl<const D: usize, M: Mirror<D>, R: IntoIterator<Item = Ray<D>>> Simulation<M, R> {
+    #[inline]
     pub fn get_ray_paths(self, reflection_limit: usize) -> impl Iterator<Item = RayPath<D>> {
         let mut intersections_scratch = Vec::new();
         self.rays.into_iter().map(move |mut ray| {

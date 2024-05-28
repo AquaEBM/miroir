@@ -114,8 +114,7 @@ impl CameraController {
 
         let mut res = true;
 
-        const SPEED_DECREASE_RATIO: f32 = 0.75;
-        const SENSITIVITY_DECREASE_RATIO: f32 = 0.8;
+        const RATIO: f32 = 0.8;
 
         use VirtualKeyCode::*;
 
@@ -126,10 +125,10 @@ impl CameraController {
             D      => self.amount_right = amount,
             Space  => self.amount_up = amount,
             LShift => self.amount_down = amount,
-            Up     => self.speed /= SPEED_DECREASE_RATIO,
-            Down   => self.speed *= SPEED_DECREASE_RATIO,
-            Right  => self.mouse_sensitivity /= SENSITIVITY_DECREASE_RATIO,
-            Left   => self.mouse_sensitivity *= SENSITIVITY_DECREASE_RATIO,
+            Up     => self.speed /= RATIO,
+            Down   => self.speed *= RATIO,
+            Right  => self.mouse_sensitivity /= RATIO,
+            Left   => self.mouse_sensitivity *= RATIO,
             _ => res = false,
         }
 

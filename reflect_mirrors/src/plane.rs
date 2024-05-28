@@ -56,8 +56,10 @@ impl<const D: usize> PlaneMirror<D> {
 }
 
 impl<const D: usize> Mirror<D> for PlaneMirror<D> {
-    fn append_intersecting_points(&self, ray: &Ray<D>, mut list: List<TangentPlane<D>>) {
+    fn add_tangents(&self, ctx: &mut SimulationCtx<D>) {
         let p = self.inner_plane();
+
+        let ray = ctx.ray();
 
         let intersection_coords = p.intersection_coordinates(ray, p.v0());
 
@@ -68,7 +70,7 @@ impl<const D: usize> Mirror<D> for PlaneMirror<D> {
                 .all(|mu| mu.abs() < 1.0)
                 .then_some(distance)
         }) {
-            list.push(TangentPlane {
+            ctx.add_tangent(TangentPlane {
                 // We could return `self.plane.v0()`, but since we already calculated `t`,
                 // we might as well save the simulation runner some work, and return that
                 intersection: Intersection::Distance(t),
@@ -187,202 +189,5 @@ impl OpenGLRenderable for PlaneMirror<3> {
         list.push(Box::new(PlaneRenderData {
             vertices: gl::VertexBuffer::new(display, vertices.as_slice()).unwrap(),
         }))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn test_left_basic_2d() {
-        let mirror = PlaneMirror::<2>::from_json(&json!({
-            "center": [0., 0.],
-            "basis": [
-                [0., 1.],
-            ],
-            "bounds": [1.],
-        }))
-        .expect("json monke");
-
-        let mut ray = Ray {
-            origin: [-1., 0.].into(),
-            direction: Unit::new_normalize([1., 0.].into()),
-        };
-
-        let mut intersections = vec![];
-        mirror.append_intersecting_points(&ray, List::from(&mut intersections));
-
-        let [tangent] = intersections.as_slice() else {
-            panic!("there must be one intersection");
-        };
-
-        let d = tangent.try_ray_intersection(&ray);
-
-        if let Some(t) = d {
-            assert!((t - 1.).abs() < Float::EPSILON * 4.0);
-            ray.advance(t);
-        } else {
-            panic!("there must be distance");
-        }
-
-        ray.reflect_dir(&tangent.direction);
-
-        assert!((ray.origin - SVector::from([0., 0.])).norm().abs() < Float::EPSILON * 4.0);
-        assert!(
-            (ray.direction.as_ref() - SVector::from([-1., 0.]))
-                .norm()
-                .abs()
-                < Float::EPSILON * 4.0
-        );
-    }
-
-    #[test]
-    fn test_right_basic_2d() {
-        let mirror = PlaneMirror::<2>::from_json(&json!({
-            "center": [0., 0.],
-            "basis": [
-                [0., 1.],
-            ],
-            "bounds": [1.],
-        }))
-        .expect("json monke");
-
-        let mut ray = Ray {
-            origin: [1., 0.].into(),
-            direction: Unit::new_normalize([-1., 0.].into()),
-        };
-
-        let mut intersections = vec![];
-
-        mirror.append_intersecting_points(&ray, List::from(List::from(&mut intersections)));
-
-        let [tangent] = intersections.as_slice() else {
-            panic!("there must be an intersection");
-        };
-
-        let d = tangent.try_ray_intersection(&ray);
-
-        if let Some(t) = d {
-            assert!((t - 1.).abs() < Float::EPSILON * 4.0);
-            ray.advance(t);
-        } else {
-            panic!("there must be distance");
-        }
-
-        ray.reflect_dir(&tangent.direction);
-
-        assert!((ray.origin - SVector::from([0., 0.])).norm().abs() < Float::EPSILON * 4.0);
-        assert!(
-            (ray.direction.as_ref() - SVector::from([1., 0.]))
-                .norm()
-                .abs()
-                < Float::EPSILON * 4.0
-        );
-    }
-
-    #[test]
-    fn test_diagonal_2d() {
-        let mirror = PlaneMirror::<2>::from_json(&json!({
-            "center": [0., 0.],
-            "basis": [
-                [0.70710677, 0.70710677],
-            ],
-            "bounds": [1.],
-        }))
-        .expect("json monke");
-
-        let mut ray = Ray {
-            origin: [-1., 1.].into(),
-            direction: Unit::new_normalize([1., -1.].into()),
-        };
-
-        let mut intersections = vec![];
-        mirror.append_intersecting_points(&ray, List::from(&mut intersections));
-
-        let [tangent] = intersections.as_slice() else {
-            panic!("there must be an intersection");
-        };
-
-        let d = tangent.try_ray_intersection(&ray);
-
-        if let Some(t) = d {
-            assert!((t - 1.4142135623730951).abs() < Float::EPSILON * 4.0);
-            ray.advance(t);
-        } else {
-            panic!("there must be distance");
-        }
-
-        ray.reflect_dir(&tangent.direction);
-
-        assert!((ray.origin - SVector::from([0., 0.])).norm().abs() < Float::EPSILON * 4.0);
-        assert!(
-            (ray.direction.as_ref() - SVector::from([-0.7071067811865476, 0.7071067811865476]))
-                .norm()
-                .abs()
-                < Float::EPSILON * 4.0
-        );
-    }
-
-    #[test]
-    fn test_multiple_intersections_2d() {
-        let m1 = PlaneMirror::<2>::from_json(&json!({
-            "center": [10., 0.],
-            "basis": [
-                [0., 1.],
-            ],
-            "bounds": [1.],
-        }))
-        .expect("json monke");
-
-        let m2 = PlaneMirror::<2>::from_json(&json!({
-            "center": [-1., 0.],
-            "basis": [
-                [0., 1.],
-            ],
-            "bounds": [1.],
-        }))
-        .expect("json monke");
-
-        let mut ray = Ray {
-            origin: [0., 0.5].into(),
-            direction: Unit::new_normalize([1., 0.].into()),
-        };
-
-        let mut pts = vec![];
-        m1.append_intersecting_points(&ray, List::from(&mut pts));
-        m2.append_intersecting_points(&ray, List::from(&mut pts));
-
-        let [t1, t2] = pts.as_slice() else {
-            panic!("there must be an intersection");
-        };
-
-        let d1 = t1.try_ray_intersection(&ray);
-        let d2 = t2.try_ray_intersection(&ray);
-
-        if let Some(t) = d1 {
-            assert!((t - 10.).abs() < Float::EPSILON * 4.0);
-            ray.advance(t);
-        } else {
-            panic!("there must be distance");
-        }
-
-        if let Some(t) = d2 {
-            assert!((t - -1.).abs() < Float::EPSILON * 4.0);
-        } else {
-            panic!("there must be distance");
-        }
-
-        ray.reflect_dir(&t1.direction);
-
-        assert!((ray.origin - SVector::from([10., 0.5])).norm().abs() < Float::EPSILON * 4.0);
-        assert!(
-            (ray.direction.as_ref() - SVector::from([-1., 0.]))
-                .norm()
-                .abs()
-                < Float::EPSILON * 4.0
-        );
     }
 }

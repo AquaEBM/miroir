@@ -53,20 +53,20 @@ impl CylindricalMirror {
 }
 
 impl Mirror<3> for CylindricalMirror {
-    fn append_intersecting_points(&self, ray: &Ray<3>, mut list: List<TangentPlane<3>>) {
+    fn add_tangents(&self, ctx: &mut SimulationCtx<3>) {
         let line_coord = |v| self.dist.dot(&v) * self.inv_norm_dist_squared;
         let p = |v| line_coord(v) * self.dist;
+
+        let ray = *ctx.ray();
 
         let m = ray.origin - self.start;
         let d = ray.direction.into_inner();
         let pm = p(m);
         let pd = p(d);
 
-        let c = (m - pm).norm_squared() - self.radius_sq;
-
-        let b = m.dot(&d) - 2.0 * d.dot(&pm) + pm.dot(&pd);
-
         let a = (d - pd).norm_squared();
+        let b = m.dot(&d) - 2.0 * d.dot(&pm) + pm.dot(&pd);
+        let c = (m - pm).norm_squared() - self.radius_sq;
 
         let delta = b * b - a * c;
 
@@ -82,10 +82,10 @@ impl Mirror<3> for CylindricalMirror {
 
                 // Thanks clippy!
                 if (0.0..=1.0).contains(&coord) {
-                    // SAFETY: the length of origin - line_pt is always self.radius
+                    // SAFETY: the vector `origin - v0` always has length `r = self.radius`
                     let normal = Unit::new_unchecked((origin - line_pt) / self.radius);
 
-                    list.push(TangentPlane {
+                    ctx.add_tangent(TangentPlane {
                         intersection: Intersection::Distance(t),
                         direction: TangentSpace::Normal(normal),
                     })

@@ -1,6 +1,6 @@
 use core::ops::Deref;
 extern crate alloc;
-use alloc::{rc::Rc, sync::Arc};
+use alloc::{rc::Rc, sync::Arc, boxed::Box, collections::TryReserveError, vec::Vec};
 use std::time;
 
 use cgmath as cg;
@@ -109,6 +109,79 @@ where
     }
 }
 
+/// A wrapper around a `&mut Vec<T>` that only allows pushing/appending/extending etc...
+pub struct List<'a, T>(&'a mut Vec<T>);
+
+impl<'a, T> List<'a, T> {
+    #[inline]
+    pub fn reborrow(&mut self) -> List<T> {
+        List(self.0)
+    }
+
+    #[inline]
+    pub fn new(list: &'a mut Vec<T>) -> Self {
+        Self(list)
+    }
+
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        self.0.capacity()
+    }
+
+    #[inline]
+    pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
+        self.0.try_reserve(additional)
+    }
+
+    #[inline]
+    pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), TryReserveError> {
+        self.0.try_reserve_exact(additional)
+    }
+
+    #[inline]
+    pub fn reserve(&mut self, additional: usize) {
+        self.0.reserve(additional)
+    }
+
+    #[inline]
+    pub fn reserve_exact(&mut self, additional: usize) {
+        self.0.reserve_exact(additional)
+    }
+
+    #[inline]
+    pub fn push(&mut self, v: T) {
+        self.0.push(v)
+    }
+
+    #[inline]
+    pub fn append(&mut self, vec: &mut Vec<T>) {
+        self.0.append(vec)
+    }
+
+    #[inline]
+    pub fn extend_from_slice(&mut self, slice: &[T])
+    where
+        T: Clone,
+    {
+        self.0.extend_from_slice(slice)
+    }
+}
+
+impl<'a, T> Extend<T> for List<'a, T> {
+
+    #[inline]
+    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        self.0.extend(iter)
+    }
+}
+
+impl<'a, T> From<&'a mut Vec<T>> for List<'a, T> {
+    #[inline]
+    fn from(value: &'a mut Vec<T>) -> Self {
+        Self(value)
+    }
+}
+
 pub trait OpenGLRenderable {
     fn append_render_data(&self, display: &gl::Display, list: List<Box<dyn RenderData>>);
 }
@@ -121,7 +194,7 @@ impl<T: OpenGLRenderable> OpenGLRenderable for [T] {
 }
 
 impl<const N: usize, T: OpenGLRenderable> OpenGLRenderable for [T; N] {
-    fn append_render_data(&self, display: &glium::Display, list: List<Box<dyn RenderData>>) {
+    fn append_render_data(&self, display: &gl::Display, list: List<Box<dyn RenderData>>) {
         self.as_slice().append_render_data(display, list)
     }
 }

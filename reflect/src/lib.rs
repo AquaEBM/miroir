@@ -2,7 +2,7 @@
 
 extern crate alloc;
 
-use alloc::{collections::TryReserveError, rc::Rc, sync::Arc, vec::Vec, boxed::Box};
+use alloc::{rc::Rc, sync::Arc, vec::Vec, boxed::Box};
 use core::ops::Deref;
 
 pub use nalgebra;
@@ -11,76 +11,26 @@ use nalgebra::{SMatrix, SVector, Unit};
 
 pub type Float = f64;
 
-/// A wrapper around a `&mut Vec<T>` that only allows pushing/appending/extending etc...
-pub struct List<'a, T>(&'a mut Vec<T>);
-
-impl<'a, T> List<'a, T> {
-    #[inline]
-    pub fn reborrow(&mut self) -> List<T> {
-        List(self.0)
-    }
-
-    #[inline]
-    pub fn new(list: &'a mut Vec<T>) -> Self {
-        Self(list)
-    }
-
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        self.0.capacity()
-    }
-
-    #[inline]
-    pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
-        self.0.try_reserve(additional)
-    }
-
-    #[inline]
-    pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), TryReserveError> {
-        self.0.try_reserve_exact(additional)
-    }
-
-    #[inline]
-    pub fn reserve(&mut self, additional: usize) {
-        self.0.reserve(additional)
-    }
-
-    #[inline]
-    pub fn reserve_exact(&mut self, additional: usize) {
-        self.0.reserve_exact(additional)
-    }
-
-    #[inline]
-    pub fn push(&mut self, v: T) {
-        self.0.push(v)
-    }
-
-    #[inline]
-    pub fn append(&mut self, vec: &mut Vec<T>) {
-        self.0.append(vec)
-    }
-
-    #[inline]
-    pub fn extend_from_slice(&mut self, slice: &[T])
-    where
-        T: Clone,
-    {
-        self.0.extend_from_slice(slice)
-    }
+pub struct SimulationCtx<const D: usize> {
+    pub(crate) ray: Ray<D>,
+    pub(crate) closest: Option<(Float, TangentSpace<D>)>,
 }
 
-impl<'a, T> Extend<T> for List<'a, T> {
+impl<const D: usize> SimulationCtx<D> {
 
     #[inline]
-    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
-        self.0.extend(iter)
+    pub fn ray(&self) -> &Ray<D> {
+        &self.ray
     }
-}
 
-impl<'a, T> From<&'a mut Vec<T>> for List<'a, T> {
-    #[inline]
-    fn from(value: &'a mut Vec<T>) -> Self {
-        Self(value)
+    pub fn add_tangent(&mut self, tangent: TangentPlane<D>) {
+        let d = tangent.try_ray_intersection(self.ray()).expect("a mirror returned a plane parallel to the ray: aborting");
+
+        const E: Float = Float::EPSILON * 64.0;
+
+        if d >= E && self.closest.as_ref().map(|(t, _)| *t > d).unwrap_or(true) {
+            self.closest = Some((d, tangent.direction));
+        }
     }
 }
 
@@ -96,7 +46,7 @@ pub struct Ray<const D: usize> {
 impl<const D: usize> Ray<D> {
     /// Reflect the ray's direction with respect to the given hyperplane
     #[inline]
-    pub fn reflect_dir(&mut self, tangent: &TangentSpace<D>) {
+    fn reflect_dir(&mut self, tangent: &TangentSpace<D>) {
         self.direction = tangent.reflect_unit(self.direction);
     }
 
@@ -121,7 +71,7 @@ pub struct AffineHyperPlane<const D: usize> {
 }
 
 impl<const D: usize> AffineHyperPlane<D> {
-    /// The first element of the `vectors` array is the plane's "starting point" (i. e. v_0).
+    /// The first element of the `vectors` array is the plane's "starting point" (i. e. `v0`).
     ///
     /// The remaining `N-1` vectors are a free family spanning it's direction hyperplane
     ///
@@ -196,7 +146,7 @@ impl<const D: usize> AffineHyperPlane<D> {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 /// An affine hyperplane, like [`AffineHyperPlane`], but the basis stored is garanteed
-/// to be orthonormal, enabling projections and symmetries.
+/// to be orthonormal, enabling projections and symmetries efficiently.
 pub struct AffineHyperPlaneOrtho<const D: usize> {
     /// See [`AffineHyperPlane::new`] for info on the layout of this field
     vectors: [SVector<Float, D>; D],
@@ -370,15 +320,18 @@ impl<const D: usize> TangentPlane<D> {
 /// Some mirrors, exist and are easy to implement in all dimensions. Hence why they implement
 /// [`Mirror<D>`] for all `D`. Others can only implemented in _some_ dimensions, like 2, or 3.
 ///
-/// Note that `D` mustn't be 0. Running simulations with mirrors in 0 dimensions will
-/// cause panics or return unspecified results.
+/// Running simulations with mirrors in 0 dimensions will cause panics or return unspecified
+/// results.
 ///
 // `D` could have been an associated constant but, lack of
 // `#[feature(generic_const_exprs)]` screws us over, once again.
 pub trait Mirror<const D: usize> {
-    /// Appends to `list` a number of affine (hyper)planes, tangent to this mirror, in no particular order.
+    /// Adds a number of affine (hyper)planes, tangent to this mirror, at the
+    /// points of intersection between it and the `ray`, in no particular order.
+    /// 
+    /// The `ray` can be accessed through `ctx.ray()`
     ///
-    /// `ray` is expected to "bounce" off the plane closest to it in `list`.
+    /// The ray is expected to "bounce" off the plane closest to it.
     ///
     /// Here, "bounce" refers to the process of:
     ///     - Moving forward to the intersection.
@@ -392,21 +345,21 @@ pub trait Mirror<const D: usize> {
     ///
     /// This method is deterministic, i. e. not random: for some `ray`, it always has
     /// the same behavior for that `ray`, regardless of other circumstances/external state.
-    fn append_intersecting_points(&self, ray: &Ray<D>, list: List<TangentPlane<D>>);
+    fn add_tangents(&self, ctx: &mut SimulationCtx<D>);
 }
 
 impl<const D: usize, T: Mirror<D>> Mirror<D> for [T] {
     #[inline]
-    fn append_intersecting_points(&self, ray: &Ray<D>, mut list: List<TangentPlane<D>>) {
+    fn add_tangents(&self, ctx: &mut SimulationCtx<D>) {
         self.iter()
-            .for_each(|mirror| mirror.append_intersecting_points(ray, list.reborrow()))
+            .for_each(|mirror| mirror.add_tangents(ctx))
     }
 }
 
 impl<const N: usize, const D: usize, T: Mirror<D>> Mirror<D> for [T; N] {
     #[inline]
-    fn append_intersecting_points(&self, ray: &Ray<D>, list: List<TangentPlane<D>>) {
-        self.as_slice().append_intersecting_points(ray, list)
+    fn add_tangents(&self, ctx: &mut SimulationCtx<D>) {
+        self.as_slice().add_tangents(ctx)
     }
 }
 
@@ -415,43 +368,43 @@ impl<const N: usize, const D: usize, T: Mirror<D>> Mirror<D> for [T; N] {
 
 impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Box<T> {
     #[inline]
-    fn append_intersecting_points(&self, ray: &Ray<D>, list: List<TangentPlane<D>>) {
-        self.deref().append_intersecting_points(ray, list)
+    fn add_tangents(&self, ctx: &mut SimulationCtx<D>) {
+        self.deref().add_tangents(ctx)
     }
 }
 
 impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Arc<T> {
     #[inline]
-    fn append_intersecting_points(&self, ray: &Ray<D>, list: List<TangentPlane<D>>) {
-        self.deref().append_intersecting_points(ray, list)
+    fn add_tangents(&self, ctx: &mut SimulationCtx<D>) {
+        self.deref().add_tangents(ctx)
     }
 }
 
 impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Rc<T> {
     #[inline]
-    fn append_intersecting_points(&self, ray: &Ray<D>, list: List<TangentPlane<D>>) {
-        self.deref().append_intersecting_points(ray, list)
+    fn add_tangents(&self, ctx: &mut SimulationCtx<D>) {
+        self.deref().add_tangents(ctx)
     }
 }
 
 impl<const D: usize, T: Mirror<D>> Mirror<D> for Vec<T> {
     #[inline]
-    fn append_intersecting_points(&self, ray: &Ray<D>, list: List<TangentPlane<D>>) {
-        self.deref().append_intersecting_points(ray, list)
+    fn add_tangents(&self, ctx: &mut SimulationCtx<D>) {
+        self.deref().add_tangents(ctx)
     }
 }
 
 impl<'a, const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for &'a T {
     #[inline]
-    fn append_intersecting_points(&self, ray: &Ray<D>, list: List<TangentPlane<D>>) {
-        (*self).append_intersecting_points(ray, list)
+    fn add_tangents(&self, ctx: &mut SimulationCtx<D>) {
+        (*self).add_tangents(ctx)
     }
 }
 
 impl<'a, const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for &'a mut T {
     #[inline]
-    fn append_intersecting_points(&self, ray: &Ray<D>, list: List<TangentPlane<D>>) {
-        self.deref().append_intersecting_points(ray, list)
+    fn add_tangents(&self, ctx: &mut SimulationCtx<D>) {
+        self.deref().add_tangents(ctx)
     }
 }
 
@@ -544,36 +497,24 @@ pub struct Simulation<M, R> {
 impl<const D: usize, M: Mirror<D>, R: IntoIterator<Item = Ray<D>>> Simulation<M, R> {
     #[inline]
     pub fn get_ray_paths(self, reflection_limit: usize) -> impl Iterator<Item = RayPath<D>> {
-        let mut intersections_scratch = Vec::new();
-        self.rays.into_iter().map(move |mut ray| {
+        let Self { rays, mirror } = self;
+        rays.into_iter().map(move |ray| {
+
+            let mut ctx = SimulationCtx { ray, closest: None };
             let mut ray_path = RayPath::default();
             ray_path.push_point(ray.origin);
 
             for _n in 0..reflection_limit {
-                intersections_scratch.clear();
-                self.mirror
-                    .append_intersecting_points(&ray, List::new(&mut intersections_scratch));
+                mirror.add_tangents(&mut ctx);
 
-                if let Some((distance, tangent)) = intersections_scratch
-                    .iter()
-                    .filter_map(|tangent| {
-                        let d = tangent
-                            .try_ray_intersection(&ray)
-                            .expect("a mirror returned a plane parallel to the ray: aborting");
-                        (d > Float::EPSILON * 64.0).then_some((d, tangent))
-                    })
-                    .min_by(|(d1, _), (d2, _)| {
-                        d1.partial_cmp(d2)
-                            .expect("NaN found in intersection distances: aborting")
-                    })
-                {
-                    ray.advance(distance);
-                    if !ray_path.try_push_point(ray.origin, Float::EPSILON * 64.0) {
+                if let Some((distance, space)) = ctx.closest.take() {
+                    ctx.ray.advance(distance);
+                    if !ray_path.try_push_point(ctx.ray.origin, Float::EPSILON * 64.0) {
                         break;
                     }
-                    ray.reflect_dir(&tangent.direction)
+                    ctx.ray.reflect_dir(&space)
                 } else {
-                    ray_path.set_divergence_direction(ray.direction);
+                    ray_path.set_divergence_direction(ctx.ray.direction);
                     break;
                 }
             }

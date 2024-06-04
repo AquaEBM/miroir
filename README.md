@@ -24,7 +24,7 @@ Other third-party integrations can easily be created over the simple API of the 
 cargo doc -p reflect --no-deps --open
 ```
 
-The binary crate `gen_rand_sim` can generate random simulations and serialise to json, using `reflect_json` and `reflect_random`:
+The binary crate `gen_rand_sim` can generate random simulations and serialise them to JSON, using `reflect_json` and `reflect_random`:
 
 ```shell
 cargo run -r -p gen_rand_sim "<path/to/file.json>" [dimensions=2] [num_mirrors=12] [num_rays=4]
@@ -67,7 +67,7 @@ flutter run --release
 
 ### Controls for `reflect_glium`
 
-The `reflect_glium` binary crate (which is run by the `mirror_verse_ui`) allows viewing simulations where you can move around and rotate the camera. Here are the controls:
+The `reflect_glium` binary crate (which is run by `mirror_verse_ui`) allows viewing simulations where you can move around and rotate the camera. Here are the controls:
 
 - Use the WASD keys (or ZQSD) to move forward, left, backward, and right, respectively.
 - Use the space bar to move up and the shift key to move down.

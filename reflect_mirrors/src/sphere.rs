@@ -40,13 +40,13 @@ impl<const D: usize> Mirror<D> for EuclideanSphereMirror<D> {
         let ray = *ctx.ray();
 
         let d = &ray.direction;
-        
+
         let v0 = &self.center;
         let v = ray.origin - v0;
-        
+
         let r = self.radius();
         let s = v.norm_squared();
-        
+
         let a = d.norm_squared();
         let b = v.dot(d);
         let c = s - r * r;
@@ -61,9 +61,9 @@ impl<const D: usize> Mirror<D> for EuclideanSphereMirror<D> {
                 let origin = ray.at(t);
                 // SAFETY: the vector `origin - v0` always has length `r = self.radius`
                 let normal = Unit::new_unchecked((origin - v0) / r.abs());
-                ctx.add_tangent(TangentPlane {
+                ctx.add_tangent(Plane {
                     intersection: Intersection::Distance(t),
-                    direction: TangentSpace::Normal(normal),
+                    direction: HyperPlane::Normal(normal),
                 });
             }
         }

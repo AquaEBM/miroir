@@ -4,7 +4,7 @@ use std::error::Error;
 
 extern crate alloc;
 
-use alloc::{rc::Rc, sync::Arc};
+use alloc::{rc::Rc, sync::Arc, boxed::Box, vec::Vec, string::String};
 use core::ops::Deref;
 
 pub use serde_json;
@@ -167,25 +167,24 @@ impl<T: JsonDes> JsonDes for Vec<T> {
     }
 }
 
-impl<const D: usize, M: JsonDes> JsonDes for reflect::Simulation<M, Vec<Ray<D>>> {
-    fn from_json(json: &serde_json::Value) -> Result<Self, Box<dyn Error>> {
-        let mirror = M::from_json(json.get("mirror").ok_or("mirror field expected")?)?;
-
-        let rays = map_json_array(
-            json.get("rays").ok_or("ray field expected")?,
-            Ray::from_json,
-        )?;
-
-        Ok(Self { mirror, rays })
-    }
+pub fn serialize_simulation<const D: usize>(mirror: &(impl JsonSer + ?Sized), rays: impl IntoIterator<Item = Ray<D>>) -> serde_json::Value {
+    serde_json::json!({
+        "dim": D,
+        "mirror": mirror.to_json(),
+        "rays": Vec::from_iter(rays.into_iter().map(|ray| ray.to_json())),
+    })
 }
 
-impl<const D: usize, T: JsonSer> JsonSer for reflect::Simulation<T, Vec<Ray<D>>> {
-    fn to_json(&self) -> serde_json::Value {
-        serde_json::json!({
-            "dim": D,
-            "rays": Vec::from_iter(self.rays.iter().map(Ray::to_json)),
-            "mirror": self.mirror.to_json(),
-        })
+pub fn deserialize_simulation<const D: usize, M: JsonDes>(json: &serde_json::Value) -> Result<(M, Vec<Ray<D>>), Box<dyn Error>> {
+    let dim = json.get("dim").ok_or("dim field expected")?.as_u64().ok_or("dim field must be a positive integer")? as usize;
+    if dim != D {
+        return Err(format!("dimension must be {D}").into())
     }
+    Ok((
+        M::from_json(json.get("mirror").ok_or("mirror field expected")?)?,
+        map_json_array(
+            json.get("rays").ok_or("ray field expected")?,
+            Ray::from_json,
+        )?,
+    ))
 }

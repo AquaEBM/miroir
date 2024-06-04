@@ -3,12 +3,12 @@ use core::array;
 use super::*;
 
 /// A parallelotope-shaped reflective (hyper)plane
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PlaneMirror<const D: usize> {
     /// The plane this mirror belongs to.
-    plane: AffineHyperPlane<D>,
+    plane: AffineHyperPlaneBasis<D>,
     /// The same plane, but represented with an orthonormal basis, useful for orthogonal symmetries
-    orthonormalised: AffineHyperPlaneOrtho<D>,
+    orthonormalised: AffineHyperPlaneBasisOrtho<D>,
 }
 
 impl<const D: usize> PlaneMirror<D> {
@@ -16,7 +16,7 @@ impl<const D: usize> PlaneMirror<D> {
         vectors.try_into().ok()
     }
 
-    pub fn inner_plane(&self) -> &AffineHyperPlane<D> {
+    pub fn inner_plane(&self) -> &AffineHyperPlaneBasis<D> {
         &self.plane
     }
 }
@@ -25,7 +25,7 @@ impl<const D: usize> TryFrom<[SVector<Float, D>; D]> for PlaneMirror<D> {
     type Error = ();
 
     fn try_from(vectors: [SVector<Float, D>; D]) -> Result<Self, Self::Error> {
-        AffineHyperPlane::new(vectors)
+        AffineHyperPlaneBasis::new(vectors)
             .map(|(plane, orthonormalised)| Self {
                 plane,
                 orthonormalised,
@@ -70,11 +70,11 @@ impl<const D: usize> Mirror<D> for PlaneMirror<D> {
                 .all(|mu| mu.abs() < 1.0)
                 .then_some(distance)
         }) {
-            ctx.add_tangent(TangentPlane {
+            ctx.add_tangent(Plane {
                 // We could return `self.plane.v0()`, but since we already calculated `t`,
                 // we might as well save the simulation runner some work, and return that
                 intersection: Intersection::Distance(t),
-                direction: TangentSpace::Plane(self.orthonormalised),
+                direction: HyperPlane::Plane(self.orthonormalised.clone()),
             });
         }
     }

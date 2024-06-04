@@ -5,13 +5,11 @@ use nalgebra::{SVector, Unit};
 use core::iter;
 pub use rand;
 
-pub trait Random {
+pub trait Random: Sized {
     /// Generate a randomized version of this mirror using the provided `rng`
     ///
     /// This method must not fail. If creating a mirror is faillible, keep trying until success
-    fn random(rng: &mut (impl rand::Rng + ?Sized)) -> Self
-    where
-        Self: Sized;
+    fn random(rng: &mut (impl rand::Rng + ?Sized)) -> Self;
 }
 
 impl<const D: usize> Random for Ray<D> {
@@ -27,21 +25,17 @@ impl<const D: usize> Random for Ray<D> {
     }
 }
 
-impl<T: Random, const D: usize> Random for Simulation<T, Vec<Ray<D>>> {
-    fn random(rng: &mut (impl rand::Rng + ?Sized)) -> Self
-    where
-        Self: Sized,
-    {
-        const MIN_NUM_RAYS: usize = 1;
-        const MAX_NUM_RAYS: usize = 32;
-        let num_rays = rng.gen_range(MIN_NUM_RAYS..MAX_NUM_RAYS);
-        Self {
-            rays: iter::repeat_with(|| Ray::random(rng))
-                .take(num_rays)
-                .collect(),
-            mirror: T::random(rng),
-        }
-    }
+pub fn random_simulation<const D: usize, M: Mirror<D> + Random>(rng: &mut (impl rand::Rng + ?Sized)) -> (M, Vec<Ray<D>>) {
+    const MIN_NUM_RAYS: usize = 1;
+    const MAX_NUM_RAYS: usize = 32;
+    let num_rays = rng.gen_range(MIN_NUM_RAYS..MAX_NUM_RAYS);
+
+    (
+        M::random(rng),
+        iter::repeat_with(|| Ray::random(rng))
+            .take(num_rays)
+            .collect(),
+    )
 }
 
 pub fn rand_vect<const D: usize>(

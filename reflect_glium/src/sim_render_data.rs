@@ -18,12 +18,15 @@ where
         mirror_render_data: Vec<Box<dyn RenderData>>,
         program: gl::Program,
     ) -> Self {
+        
         Self {
             ray_render_data,
             mirror_render_data,
             program,
         }
     }
+
+
 }
 
 const FRAGMENT_SHADER_SRC: &str = r#"
@@ -38,13 +41,16 @@ const FRAGMENT_SHADER_SRC: &str = r#"
     }
 "#;
 
+
+
 impl SimRenderData<3> {
     pub(crate) fn from_simulation<
-        M: Mirror<3> + OpenGLRenderable,
+        M: Mirror<3> + OpenGLRenderable + ?Sized,
         R: IntoIterator<Item = Ray<3>>,
     >(
-        sim: Simulation<M, R>,
-        reflection_limit: usize,
+        mirror: &M,
+        rays: R,
+        reflection_limit: Option<usize>,
         display: &gl::Display,
     ) -> Self {
         const VERTEX_SHADER_SRC_3D: &str = r#"
@@ -65,11 +71,16 @@ impl SimRenderData<3> {
 
         let mut render_data = vec![];
 
-        sim.mirror
+        mirror
             .append_render_data(display, List::from(&mut render_data));
 
+        let mut vertex_scratch = vec![];
+
         Self::new(
-            RayRenderData::<3>::from_simulation(sim, reflection_limit, display),
+            Vec::from_iter(rays.into_iter().map(|ray| {
+                vertex_scratch.clear();
+                RayRenderData::from_ray(&mut vertex_scratch, mirror, ray, reflection_limit, display)
+            })),
             render_data,
             program,
         )
@@ -78,11 +89,12 @@ impl SimRenderData<3> {
 
 impl SimRenderData<2> {
     pub(crate) fn from_simulation<
-        M: Mirror<2> + OpenGLRenderable,
+        M: Mirror<2> + OpenGLRenderable + ?Sized,
         R: IntoIterator<Item = Ray<2>>,
     >(
-        sim: Simulation<M, R>,
-        reflection_limit: usize,
+        mirror: &M,
+        rays: R,
+        reflection_limit: Option<usize>,
         display: &gl::Display,
     ) -> Self {
         const VERTEX_SHADER_SRC_2D: &str = r#"
@@ -103,11 +115,16 @@ impl SimRenderData<2> {
 
         let mut render_data = vec![];
 
-        sim.mirror
+        mirror
             .append_render_data(display, List::from(&mut render_data));
 
+        let mut vertex_scratch = vec![];
+
         Self::new(
-            RayRenderData::<2>::from_simulation(sim, reflection_limit, display),
+            rays.into_iter().map(|ray| {
+                vertex_scratch.clear();
+                RayRenderData::from_ray(&mut vertex_scratch, mirror, ray, reflection_limit, display)
+            }).collect(),
             render_data,
             program,
         )
@@ -235,9 +252,7 @@ where
     }
 
     fn render_3d(&self, display: &gl::Display, camera: &Camera, projection: &Projection) {
-        const ORIGIN_COLOR: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
         const RAY_NON_LOOP_COL: [f32; 4] = [0.7, 0.3, 0.1, 1.0];
-        const RAY_LOOP_COL: [f32; 4] = [1.0, 0.0, 1.0, 1.0];
         let mirror_color = if D >= 3 {
             [0.3f32, 0.3, 0.9, 0.4]
         } else {
@@ -267,42 +282,13 @@ where
         for ray in &self.ray_render_data {
             target
                 .draw(
-                    &ray.non_loop_path,
+                    &ray.path,
                     LINE_STRIP,
                     &self.program,
                     &gl::uniform! {
                         perspective: perspective,
                         view: view,
                         color_vec: RAY_NON_LOOP_COL,
-                    },
-                    &params,
-                )
-                .unwrap();
-
-            target
-                .draw(
-                    &ray.loop_path,
-                    LINE_STRIP,
-                    &self.program,
-                    &gl::uniform! {
-                        perspective: perspective,
-                        view: view,
-                        color_vec: RAY_LOOP_COL,
-                    },
-                    &params,
-                )
-                .unwrap();
-
-            let o = &ray.origin;
-            target
-                .draw(
-                    o.vertices(),
-                    o.indices(),
-                    &self.program,
-                    &gl::uniform! {
-                        perspective: perspective,
-                        view: view,
-                        color_vec: ORIGIN_COLOR,
                     },
                     &params,
                 )

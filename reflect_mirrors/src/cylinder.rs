@@ -85,9 +85,9 @@ impl Mirror<3> for CylindricalMirror {
                     // SAFETY: the vector `origin - v0` always has length `r = self.radius`
                     let normal = Unit::new_unchecked((origin - line_pt) / self.radius);
 
-                    ctx.add_tangent(TangentPlane {
+                    ctx.add_tangent(Plane {
                         intersection: Intersection::Distance(t),
-                        direction: TangentSpace::Normal(normal),
+                        direction: HyperPlane::Normal(normal),
                     })
                 }
             }
@@ -201,7 +201,8 @@ impl OpenGLRenderable for CylindricalMirror {
         // to `b`, let `v = a + b`, let `O = (v * vT) / (vT * v) or v ⊗ v / <v, v>`
         // (outer product divided by the inner product)
         // Then, `R = 2 * O - Id`
-        let rot = 2.0 / k.norm_squared() * k.kronecker(&k.transpose()) - nalgebra::SMatrix::identity();
+        let rot =
+            2.0 / k.norm_squared() * k.kronecker(&k.transpose()) - nalgebra::SMatrix::identity();
 
         let r = self.radius() as f32;
         let start = self.line_segment()[0].map(|s| s as f32);

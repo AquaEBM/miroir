@@ -1,5 +1,5 @@
-use reflect::{Ray, Simulation};
-use reflect_json::{serde_json, JsonDes, JsonType};
+// use reflect::{Ray, Simulation};
+use reflect_json::{deserialize_simulation, serde_json, JsonType};
 use reflect_mirrors::*;
 
 use std::{collections::HashMap, error::Error, format as f, fs::File, sync::OnceLock};
@@ -128,7 +128,7 @@ impl reflect_json::JsonDes for Box<dyn SimulationMirror<3>> {
     }
 }
 
-fn run_simulation(reflection_cap: usize, json: &serde_json::Value) -> Result<(), Box<dyn Error>> {
+fn run_simulation(reflection_cap: Option<usize>, json: &serde_json::Value) -> Result<(), Box<dyn Error>> {
     let dim = json
         .get("dim")
         .ok_or(r#"invalid json: expected a "dim" field"#)?
@@ -136,10 +136,10 @@ fn run_simulation(reflection_cap: usize, json: &serde_json::Value) -> Result<(),
         .ok_or(r#""dim" field must be a number"#)?;
 
     match dim {
-        2 => Simulation::<Box<dyn SimulationMirror<2>>, Vec<Ray<2>>>::from_json(json)
-            .map(|sim| reflect_glium::run_2d(sim, reflection_cap)),
-        3 => Simulation::<Box<dyn SimulationMirror<3>>, Vec<Ray<3>>>::from_json(json)
-            .map(|sim| reflect_glium::run_3d(sim, reflection_cap)),
+        2 => deserialize_simulation::<2, Box<dyn SimulationMirror<2>>>(json)
+            .map(|(mirror, rays)| reflect_glium::run_2d(&mirror, rays, reflection_cap)),
+        3 => deserialize_simulation::<3, Box<dyn SimulationMirror<3>>>(json)
+            .map(|(mirror, rays)| reflect_glium::run_3d(&mirror, rays, reflection_cap)),
         _ => Err("dimension must be 2 or 3".into()),
     }
 }
@@ -153,69 +153,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let max_num_reflections = args
         .next()
-        .map(|arg| arg.parse().expect("expected a number as second argument"))
-        .unwrap_or(1000);
+        .map(|arg| arg.parse().expect("expected a number as second argument"));
 
     run_simulation(
         max_num_reflections,
         &serde_json::from_reader(File::open(file_path)?)?,
     )
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_loop_detection() {
-        let simulation =
-            Simulation::<Box<dyn SimulationMirror<3>>, Vec<Ray<3>>>::from_json(&serde_json::json!(
-                {
-                    "mirror": {
-                        "type": "[]plane",
-                        "mirror": [
-                            {
-                                "center": [1., 0., 0.],
-                                "basis": [
-                                    [0., 1., 0.],
-                                    [0., 0., 1.],
-                                ],
-                                "bounds": [1.,1.],
-                            },
-                            {
-                                "center": [-1., 0., 0.],
-                                "basis": [
-                                    [0., 1., 0.],
-                                    [0., 0., 1.],
-                                ],
-                                "bounds": [1.,1.],
-                            }
-                        ],
-                    },
-                    "rays": [
-                        {
-                            "origin": [0., 0., 0.],
-                            "direction": [1., 0., 0.],
-                        }
-                    ],
-                }
-            ))
-            .unwrap();
-
-        let mut path = simulation.get_ray_paths(100);
-        assert!(path.next().unwrap().all_points_raw().len() == 4);
-    }
-
-    #[test]
-    fn test_no_loop_detection() {
-        let simulation = Simulation::<Box<dyn SimulationMirror<2>>, Vec<Ray<2>>>::from_json(
-            &include_str!("../../assets/diamond_of_hell.json")
-                .parse()
-                .expect("invalid json in assets/diamond_of_hell.json"),
-        )
-        .unwrap();
-
-        let mut path = simulation.get_ray_paths(100);
-        assert!(path.next().unwrap().all_points_raw().len() == 101);
-    }
 }

@@ -2,7 +2,7 @@
 
 extern crate alloc;
 
-use alloc::{rc::Rc, sync::Arc, vec::Vec, boxed::Box};
+use alloc::{boxed::Box, rc::Rc, sync::Arc, vec::Vec};
 use core::ops::Deref;
 
 pub use nalgebra;
@@ -11,26 +11,47 @@ use nalgebra::{SMatrix, SVector, Unit};
 
 pub type Float = f64;
 
+#[derive(Clone, PartialEq, Debug)]
 pub struct SimulationCtx<const D: usize> {
     pub(crate) ray: Ray<D>,
-    pub(crate) closest: Option<(Float, TangentSpace<D>)>,
+    pub(crate) closest: Option<(Float, HyperPlane<D>)>,
 }
 
 impl<const D: usize> SimulationCtx<D> {
+    #[inline]
+    fn new(ray: Ray<D>) -> Self {
+        Self { ray, closest: None }
+    }
 
     #[inline]
     pub fn ray(&self) -> &Ray<D> {
         &self.ray
     }
 
-    pub fn add_tangent(&mut self, tangent: TangentPlane<D>) {
-        let d = tangent.try_ray_intersection(self.ray()).expect("a mirror returned a plane parallel to the ray: aborting");
+    #[inline]
+    pub fn add_tangent(&mut self, tangent: Plane<D>) {
+        let d = tangent
+            .try_ray_intersection(self.ray())
+            .expect("a mirror returned a plane parallel to the ray: aborting");
 
         const E: Float = Float::EPSILON * 64.0;
 
         if d >= E && self.closest.as_ref().map(|(t, _)| *t > d).unwrap_or(true) {
             self.closest = Some((d, tangent.direction));
         }
+    }
+
+    #[inline]
+    fn next_ray<M: Mirror<D> + ?Sized>(&mut self, mirror: &M) -> Option<Ray<D>> {
+        mirror.add_tangents(self);
+
+        let ray = &mut self.ray;
+
+        self.closest.take().map(|(dist, dir_space)| {
+            ray.advance(dist);
+            ray.reflect_dir(&dir_space);
+            *ray
+        })
     }
 }
 
@@ -46,8 +67,8 @@ pub struct Ray<const D: usize> {
 impl<const D: usize> Ray<D> {
     /// Reflect the ray's direction with respect to the given hyperplane
     #[inline]
-    fn reflect_dir(&mut self, tangent: &TangentSpace<D>) {
-        self.direction = tangent.reflect_unit(self.direction);
+    pub fn reflect_dir(&mut self, dir_space: &HyperPlane<D>) {
+        self.direction = dir_space.reflect_unit(self.direction);
     }
 
     /// Move the ray's position forward (or backward if t < 0.0) by `t`
@@ -64,13 +85,13 @@ impl<const D: usize> Ray<D> {
 }
 
 /// An affine hyperplane
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct AffineHyperPlane<const D: usize> {
+#[derive(Clone, Debug, PartialEq)]
+pub struct AffineHyperPlaneBasis<const D: usize> {
     /// See [`AffineHyperPlane::new`] for info on the layout of this field
     vectors: [SVector<Float, D>; D],
 }
 
-impl<const D: usize> AffineHyperPlane<D> {
+impl<const D: usize> AffineHyperPlaneBasis<D> {
     /// The first element of the `vectors` array is the plane's "starting point" (i. e. `v0`).
     ///
     /// The remaining `N-1` vectors are a free family spanning it's direction hyperplane
@@ -79,11 +100,11 @@ impl<const D: usize> AffineHyperPlane<D> {
     ///
     /// Note that an expression like `[T ; N - 1]` is locked under `#[feature(const_generic_exprs)]`.
     #[inline]
-    pub fn new(vectors: [SVector<Float, D>; D]) -> Option<(Self, AffineHyperPlaneOrtho<D>)> {
+    pub fn new(vectors: [SVector<Float, D>; D]) -> Option<(Self, AffineHyperPlaneBasisOrtho<D>)> {
         let mut orthonormalized = vectors;
         (SVector::orthonormalize(&mut orthonormalized[1..]) == D - 1).then_some((
             Self { vectors },
-            AffineHyperPlaneOrtho {
+            AffineHyperPlaneBasisOrtho {
                 vectors: orthonormalized,
             },
         ))
@@ -144,15 +165,15 @@ impl<const D: usize> AffineHyperPlane<D> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 /// An affine hyperplane, like [`AffineHyperPlane`], but the basis stored is garanteed
 /// to be orthonormal, enabling projections and symmetries efficiently.
-pub struct AffineHyperPlaneOrtho<const D: usize> {
+pub struct AffineHyperPlaneBasisOrtho<const D: usize> {
     /// See [`AffineHyperPlane::new`] for info on the layout of this field
     vectors: [SVector<Float, D>; D],
 }
 
-impl<const D: usize> AffineHyperPlaneOrtho<D> {
+impl<const D: usize> AffineHyperPlaneBasisOrtho<D> {
     /// A reference to the plane's starting point
     #[inline]
     pub fn v0(&self) -> &SVector<Float, D> {
@@ -217,23 +238,23 @@ impl<const D: usize> AffineHyperPlaneOrtho<D> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 /// Different ways of representing a hyperplane in `D`-dimensional euclidean space
-pub enum TangentSpace<const D: usize> {
+pub enum HyperPlane<const D: usize> {
     /// Only the basis of this object's direction hyperplane is used.
     ///
-    /// The starting point will be ignored by [`Simulation`]s and can be arbitrary.
-    Plane(AffineHyperPlaneOrtho<D>),
+    /// The starting point will be ignored and can be arbitrary.
+    Plane(AffineHyperPlaneBasisOrtho<D>),
     Normal(Unit<SVector<Float, D>>),
 }
 
-impl<const D: usize> TangentSpace<D> {
+impl<const D: usize> HyperPlane<D> {
     /// Reflect a vector w.r.t this hyperplane
     #[inline]
     pub fn reflect(&self, v: SVector<Float, D>) -> SVector<Float, D> {
         match self {
-            TangentSpace::Plane(plane) => 2.0 * plane.orthogonal_projection(v) - v,
-            TangentSpace::Normal(normal) => {
+            HyperPlane::Plane(plane) => 2.0 * plane.orthogonal_projection(v) - v,
+            HyperPlane::Normal(normal) => {
                 let n = normal.as_ref();
                 v - 2.0 * v.dot(n) * n
             }
@@ -255,8 +276,8 @@ impl<const D: usize> TangentSpace<D> {
     #[inline]
     pub fn try_ray_intersection(&self, p: &SVector<Float, D>, ray: &Ray<D>) -> Option<Float> {
         match self {
-            TangentSpace::Plane(plane) => plane.intersection_coordinates(ray, p).map(|v| v[0]),
-            TangentSpace::Normal(normal) => {
+            HyperPlane::Plane(plane) => plane.intersection_coordinates(ray, p).map(|v| v[0]),
+            HyperPlane::Normal(normal) => {
                 let u = ray.direction.dot(normal);
                 (u.abs() > Float::EPSILON).then(|| (p - ray.origin).dot(normal) / u)
             }
@@ -271,20 +292,20 @@ impl<const D: usize> TangentSpace<D> {
 pub enum Intersection<const D: usize> {
     /// If a [`Mirror`] returns `Intersection::Distance(t)` when calculating it's intersections with a `ray`, then `ray.at(t)` belongs to the returned tangent (hyper)plane.
     ///
-    /// This is useful if `t` is easy to calculate. as the `Simulation will not have to calculate it itself`
+    /// This is useful if `t` is easy to calculate.
     Distance(Float),
-    /// Note that the point in this vector doesn't necessarily intersect with the ray, but it serves as a starting/center point for the plane represented by [TangentPlane]
+    /// Note that the point in this vector doesn't necessarily intersect with the ray, but it serves as an offset point for the plane represented by [`Plane`]
     StartingPoint(SVector<Float, D>),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 /// Different ways of representing an _affine_ hyperplane in `D`-dimensional euclidean space
-pub struct TangentPlane<const D: usize> {
+pub struct Plane<const D: usize> {
     pub intersection: Intersection<D>,
-    pub direction: TangentSpace<D>,
+    pub direction: HyperPlane<D>,
 }
 
-impl<const D: usize> TangentPlane<D> {
+impl<const D: usize> Plane<D> {
     /// Reflect a vector w.r.t this tangent plane's direction hyperplane
     #[inline]
     pub fn reflect(&self, v: SVector<Float, D>) -> SVector<Float, D> {
@@ -326,10 +347,12 @@ impl<const D: usize> TangentPlane<D> {
 // `D` could have been an associated constant but, lack of
 // `#[feature(generic_const_exprs)]` screws us over, once again.
 pub trait Mirror<const D: usize> {
-    /// Adds a number of affine (hyper)planes, tangent to this mirror, at the
+    /// Adds the tangents to this mirror, at the
     /// points of intersection between it and the `ray`, in no particular order.
+    ///
+    /// Tangents can be added with `ctx.add_tangent(...)`.
     /// 
-    /// The `ray` can be accessed through `ctx.ray()`
+    /// The `ray` can be accessed through [`ctx.ray() `](SimulationCtx::ray).
     ///
     /// The ray is expected to "bounce" off the plane closest to it.
     ///
@@ -338,7 +361,7 @@ pub trait Mirror<const D: usize> {
     ///     - Then, orthogonally reflecting it's direction vector with
     ///       respect to the direction hyperplane.
     ///
-    /// Appends nothing if the ray doesn't intersect with the mirror that `self` represents.
+    /// Adds nothing if the ray doesn't intersect with the mirror that `self` represents.
     ///
     /// This method may push intersection points that occur "behind" the ray's
     /// origin, (`ray.at(t)` where `t < 0.0`) simulations must discard these accordingly.
@@ -351,8 +374,7 @@ pub trait Mirror<const D: usize> {
 impl<const D: usize, T: Mirror<D>> Mirror<D> for [T] {
     #[inline]
     fn add_tangents(&self, ctx: &mut SimulationCtx<D>) {
-        self.iter()
-            .for_each(|mirror| mirror.add_tangents(ctx))
+        self.iter().for_each(|mirror| mirror.add_tangents(ctx))
     }
 }
 
@@ -364,7 +386,7 @@ impl<const N: usize, const D: usize, T: Mirror<D>> Mirror<D> for [T; N] {
 }
 
 // It's clear that all these impls use the `Deref` trait, but writing a blanket impl over all types implementing `Deref`
-// makes the trait unusable downstream
+// makes it impossible to implement it for new types downstream.
 
 impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Box<T> {
     #[inline]
@@ -408,117 +430,43 @@ impl<'a, const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for &'a mut T {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Default)]
-pub struct RayPath<const D: usize> {
-    points: Vec<SVector<Float, D>>,
-    loop_start: Option<usize>,
-    divergence_direction: Option<Unit<SVector<Float, D>>>,
+pub struct RayPathIter<'a, const D: usize, M: ?Sized> {
+    pub(crate) ctx: SimulationCtx<D>,
+    pub(crate) mirror: &'a M,
 }
 
-impl<const D: usize> RayPath<D> {
-    #[inline]
-    pub fn all_points_raw(&self) -> &[SVector<Float, D>] {
-        self.points.as_slice()
-    }
+impl<'a, const D: usize, M: Mirror<D> + ?Sized> Iterator for RayPathIter<'a, D, M> {
+    type Item = SVector<Float, D>;
 
-    #[inline]
-    /// returns a pair (non_loop_points, loop_points)
-    pub fn all_points(&self) -> (&[SVector<Float, D>], &[SVector<Float, D>]) {
-        self.points
-            .split_at(self.loop_start.unwrap_or(self.points.len()))
+    fn next(&mut self) -> Option<Self::Item> {
+        self.ctx.next_ray(self.mirror).map(|ray| ray.origin)
     }
+}
 
-    #[inline]
-    // name bikeshedding welcome
-    pub fn non_loop_points(&self) -> &[SVector<Float, D>] {
-        &self.points[..self.loop_start.unwrap_or(self.points.len())]
+impl<'a, const D: usize, M: Mirror<D> + ?Sized> RayPathIter<'a, D, M> {
+    pub fn ray_dir(&self) -> Unit<SVector<Float, D>> {
+        self.ctx.ray.direction
     }
+}
 
-    #[inline]
-    pub fn loop_points(&self) -> &[SVector<Float, D>] {
-        self.loop_start
-            .map(|index| &self.points[index..])
-            .unwrap_or_default()
-    }
+#[inline]
+pub fn get_ray_path<const D: usize, M: Mirror<D> + ?Sized>(
+    mirror: &M,
+    ray: Ray<D>,
+) -> RayPathIter<D, M> {
+    RayPathIter { ctx: SimulationCtx::new(ray), mirror }
+}
 
-    #[inline]
-    pub fn divergence_direction(&self) -> Option<&Unit<SVector<Float, D>>> {
-        self.divergence_direction.as_ref()
-    }
-
-    #[inline]
-    pub fn push_point(&mut self, pt: SVector<Float, D>) {
-        self.points.push(pt);
-    }
-
-    #[inline]
-    pub fn causes_loop_at(&self, pt: SVector<Float, D>, epsilon: Float) -> Option<usize> {
-        self.points.split_last().and_then(|(last_pt, points)| {
-            points.windows(2).enumerate().find_map(|(i, window)| {
-                // ugly, but `slice::array_windows` is unstable
-                let [this_pt, next_pt] = window else {
-                    // because window.len() is always 2
-                    unreachable!()
-                };
-                ((last_pt - this_pt).norm() <= epsilon && (pt - next_pt).norm() < epsilon)
-                    .then_some(i)
-            })
+#[inline]
+pub fn loop_index<const D: usize>(path: &[SVector<Float, D>], pt: SVector<Float, D>, e: Float) -> Option<usize> {
+    path.split_last().and_then(|(last_pt, points)| {
+        points.windows(2).enumerate().find_map(|(i, window)| {
+            // ugly, but `slice::array_windows` is unstable
+            let [this_pt, next_pt] = window else {
+                // because window.len() is always 2
+                unreachable!()
+            };
+            ((last_pt - this_pt).norm() <= e && (pt - next_pt).norm() < e).then_some(i)
         })
-    }
-
-    /// Attempts to push a point to the path. If it causes an infinite loop, aborts,
-    /// registers the section of the path that loops, and returns `false`
-    #[inline]
-    pub fn try_push_point(&mut self, pt: SVector<Float, D>, epsilon: Float) -> bool {
-        let maybe_loop_index = self.causes_loop_at(pt, epsilon);
-
-        if let Some(loop_index) = maybe_loop_index {
-            self.loop_start = Some(loop_index);
-        } else {
-            self.push_point(pt);
-        }
-
-        maybe_loop_index.is_none()
-    }
-
-    #[inline]
-    pub fn set_divergence_direction(&mut self, dir: Unit<SVector<Float, D>>) -> bool {
-        let first_time = self.divergence_direction.is_none();
-        self.divergence_direction = Some(dir);
-        first_time
-    }
-}
-
-pub struct Simulation<M, R> {
-    pub rays: R,
-    pub mirror: M,
-}
-
-impl<const D: usize, M: Mirror<D>, R: IntoIterator<Item = Ray<D>>> Simulation<M, R> {
-    #[inline]
-    pub fn get_ray_paths(self, reflection_limit: usize) -> impl Iterator<Item = RayPath<D>> {
-        let Self { rays, mirror } = self;
-        rays.into_iter().map(move |ray| {
-
-            let mut ctx = SimulationCtx { ray, closest: None };
-            let mut ray_path = RayPath::default();
-            ray_path.push_point(ray.origin);
-
-            for _n in 0..reflection_limit {
-                mirror.add_tangents(&mut ctx);
-
-                if let Some((distance, space)) = ctx.closest.take() {
-                    ctx.ray.advance(distance);
-                    if !ray_path.try_push_point(ctx.ray.origin, Float::EPSILON * 64.0) {
-                        break;
-                    }
-                    ctx.ray.reflect_dir(&space)
-                } else {
-                    ray_path.set_divergence_direction(ctx.ray.direction);
-                    break;
-                }
-            }
-            ray_path
-        })
-    }
+    })
 }

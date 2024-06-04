@@ -1,13 +1,13 @@
 use core::ops::Deref;
 extern crate alloc;
-use alloc::{rc::Rc, sync::Arc, boxed::Box, collections::TryReserveError, vec::Vec};
+use alloc::{boxed::Box, collections::TryReserveError, rc::Rc, sync::Arc, vec::Vec};
 use std::time;
 
-use cgmath as cg;
 pub use glium as gl;
 pub use glium_shapes as gl_shapes;
 
 use gl::glutin;
+use cgmath as cg;
 use nalgebra as na;
 use reflect::*;
 
@@ -63,24 +63,26 @@ fn default_display_event_loop() -> (glutin::event_loop::EventLoop<()>, gl::Displ
     (el, display)
 }
 
-pub fn run_2d<M: Mirror<2> + OpenGLRenderable, R: IntoIterator<Item = Ray<2>>>(
-    sim: Simulation<M, R>,
-    reflection_limit: usize,
+pub fn run_2d<M: Mirror<2> + OpenGLRenderable + ?Sized, R: IntoIterator<Item = Ray<2>>>(
+    mirror: &M,
+    rays: R,
+    reflection_limit: Option<usize>,
 ) {
     let (el, display) = default_display_event_loop();
 
-    let drawable_simulation = SimRenderData::<2>::from_simulation(sim, reflection_limit, &display);
+    let drawable_simulation = SimRenderData::<2>::from_simulation(mirror, rays, reflection_limit, &display);
 
     drawable_simulation.run(display, el);
 }
 
-pub fn run_3d<M: Mirror<3> + OpenGLRenderable, R: IntoIterator<Item = Ray<3>>>(
-    sim: Simulation<M, R>,
-    reflection_limit: usize,
+pub fn run_3d<M: Mirror<3> + OpenGLRenderable + ?Sized, R: IntoIterator<Item = Ray<3>>>(
+    mirror: &M,
+    rays: R,
+    reflection_limit: Option<usize>,
 ) {
     let (el, display) = default_display_event_loop();
 
-    let drawable_simulation = SimRenderData::<3>::from_simulation(sim, reflection_limit, &display);
+    let drawable_simulation = SimRenderData::<3>::from_simulation(mirror, rays, reflection_limit, &display);
 
     drawable_simulation.run(display, el);
 }
@@ -168,7 +170,6 @@ impl<'a, T> List<'a, T> {
 }
 
 impl<'a, T> Extend<T> for List<'a, T> {
-
     #[inline]
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         self.0.extend(iter)

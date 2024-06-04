@@ -1,7 +1,6 @@
 use core::{iter, ops::Deref};
 use std::{env, error::Error, fs::File};
 
-use reflect::Simulation;
 use reflect_json::{serde_json, JsonSer};
 use reflect_mirrors::*;
 use reflect_random::*;
@@ -50,7 +49,7 @@ where
     fn to_json(&self) -> serde_json::Value {
         serde_json::json!({
             "type": self.0.deref().json_type_dyn(),
-            "mirror": self.0.deref().to_json(),
+            "data": self.0.deref().to_json(),
         })
     }
 }
@@ -72,27 +71,22 @@ fn generate_random_simulation(
 ) -> Result<serde_json::Value, Box<dyn Error>> {
     let mut rng = rand::thread_rng();
     if dim == 2 {
-        Ok(Simulation {
-            mirror: Dynamic::<_, 2>(gen_rand_mirrors::<Dynamic<Box<dyn JsonSerDyn>, 2>>(
+
+        Ok(reflect_json::serialize_simulation(
+            &Dynamic::<_, 2>(gen_rand_mirrors::<Dynamic<Box<dyn JsonSerDyn>, 2>>(
                 num_mirrors,
                 &mut rng,
             )),
-            rays: iter::repeat_with(|| reflect::Ray::<2>::random(&mut rng))
-                .take(num_rays)
-                .collect(),
-        }
-        .to_json())
+            iter::repeat_with(|| reflect::Ray::<2>::random(&mut rng)).take(num_rays)
+        ))
     } else if dim == 3 {
-        Ok(Simulation {
-            mirror: Dynamic::<_, 2>(gen_rand_mirrors::<Dynamic<Box<dyn JsonSerDyn>, 3>>(
+        Ok(reflect_json::serialize_simulation(
+            &Dynamic::<_, 3>(gen_rand_mirrors::<Dynamic<Box<dyn JsonSerDyn>, 3>>(
                 num_mirrors,
                 &mut rng,
             )),
-            rays: iter::repeat_with(|| reflect::Ray::<3>::random(&mut rng))
-                .take(num_rays)
-                .collect(),
-        }
-        .to_json())
+            iter::repeat_with(|| reflect::Ray::<3>::random(&mut rng)).take(num_rays)
+        ))
     } else {
         Err("dimension must be 2 or 3".into())
     }

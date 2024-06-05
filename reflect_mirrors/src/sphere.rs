@@ -116,20 +116,6 @@ impl<const D: usize> JsonSer for EuclideanSphereMirror<D> {
     }
 }
 
-impl<const D: usize> Random for EuclideanSphereMirror<D> {
-    fn random(rng: &mut (impl rand::Rng + ?Sized)) -> Self {
-        const MAX_RADIUS: Float = 3.0;
-
-        loop {
-            if let Some(mirror) =
-                Self::new(rand_vect(rng, 9.0), rng.gen::<Float>() * MAX_RADIUS.abs())
-            {
-                break mirror;
-            }
-        }
-    }
-}
-
 // Use glium_shapes::sphere::Sphere for the 3D implementation
 impl OpenGLRenderable for EuclideanSphereMirror<3> {
     fn append_render_data(&self, display: &gl::Display, mut list: List<Box<dyn RenderData>>) {

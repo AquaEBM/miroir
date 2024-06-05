@@ -6,17 +6,15 @@ use std::time;
 pub use glium as gl;
 pub use glium_shapes as gl_shapes;
 
-use gl::glutin;
 use cgmath as cg;
+use gl::glutin;
 use nalgebra as na;
 use reflect::*;
 
 mod camera;
-mod ray_render_data;
 mod sim_render_data;
 
 use camera::{Camera, CameraController, Projection};
-use ray_render_data::RayRenderData;
 use sim_render_data::SimRenderData;
 
 #[derive(Copy, Clone, Debug)]
@@ -70,7 +68,8 @@ pub fn run_2d<M: Mirror<2> + OpenGLRenderable + ?Sized, R: IntoIterator<Item = R
 ) {
     let (el, display) = default_display_event_loop();
 
-    let drawable_simulation = SimRenderData::<2>::from_simulation(mirror, rays, reflection_limit, &display);
+    let drawable_simulation =
+        SimRenderData::<2>::from_simulation(mirror, rays, reflection_limit, &display);
 
     drawable_simulation.run(display, el);
 }
@@ -82,7 +81,8 @@ pub fn run_3d<M: Mirror<3> + OpenGLRenderable + ?Sized, R: IntoIterator<Item = R
 ) {
     let (el, display) = default_display_event_loop();
 
-    let drawable_simulation = SimRenderData::<3>::from_simulation(mirror, rays, reflection_limit, &display);
+    let drawable_simulation =
+        SimRenderData::<3>::from_simulation(mirror, rays, reflection_limit, &display);
 
     drawable_simulation.run(display, el);
 }

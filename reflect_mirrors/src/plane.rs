@@ -1,14 +1,12 @@
-use core::array;
-
 use super::*;
 
 /// A parallelotope-shaped reflective (hyper)plane
 #[derive(Clone, Debug, PartialEq)]
 pub struct PlaneMirror<const D: usize> {
     /// The plane this mirror belongs to.
-    plane: AffineHyperPlaneBasis<D>,
+    plane: HyperPlaneBasis<D>,
     /// The same plane, but represented with an orthonormal basis, useful for orthogonal symmetries
-    orthonormalised: AffineHyperPlaneBasisOrtho<D>,
+    orthonormalised: HyperPlaneBasisOrtho<D>,
 }
 
 impl<const D: usize> PlaneMirror<D> {
@@ -16,7 +14,7 @@ impl<const D: usize> PlaneMirror<D> {
         vectors.try_into().ok()
     }
 
-    pub fn inner_plane(&self) -> &AffineHyperPlaneBasis<D> {
+    pub fn inner_plane(&self) -> &HyperPlaneBasis<D> {
         &self.plane
     }
 }
@@ -25,7 +23,7 @@ impl<const D: usize> TryFrom<[SVector<Float, D>; D]> for PlaneMirror<D> {
     type Error = ();
 
     fn try_from(vectors: [SVector<Float, D>; D]) -> Result<Self, Self::Error> {
-        AffineHyperPlaneBasis::new(vectors)
+        HyperPlaneBasis::new(vectors)
             .map(|(plane, orthonormalised)| Self {
                 plane,
                 orthonormalised,
@@ -139,16 +137,6 @@ impl<const D: usize> JsonSer for PlaneMirror<D> {
             "center": center,
             "basis": basis,
         })
-    }
-}
-
-impl<const D: usize> Random for PlaneMirror<D> {
-    fn random(rng: &mut (impl rand::Rng + ?Sized)) -> Self {
-        loop {
-            if let Some(mirror) = Self::try_new(array::from_fn(|_| rand_vect(rng, 10.0))) {
-                break mirror;
-            }
-        }
     }
 }
 

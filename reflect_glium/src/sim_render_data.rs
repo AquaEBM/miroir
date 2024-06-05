@@ -4,29 +4,9 @@ use gl::index::{NoIndices, PrimitiveType};
 const LINE_STRIP: NoIndices = NoIndices(PrimitiveType::LineStrip);
 
 pub(crate) struct SimRenderData<const D: usize> {
-    ray_render_data: Vec<RayRenderData<D>>,
-    mirror_render_data: Vec<Box<dyn RenderData>>,
+    rays: Vec<gl::VertexBuffer<Vertex<D>>>,
+    mirrors: Vec<Box<dyn RenderData>>,
     program: gl::Program,
-}
-
-impl<const D: usize> SimRenderData<D>
-where
-    Vertex<D>: gl::Vertex,
-{
-    fn new(
-        ray_render_data: Vec<RayRenderData<D>>,
-        mirror_render_data: Vec<Box<dyn RenderData>>,
-        program: gl::Program,
-    ) -> Self {
-        
-        Self {
-            ray_render_data,
-            mirror_render_data,
-            program,
-        }
-    }
-
-
 }
 
 const FRAGMENT_SHADER_SRC: &str = r#"
@@ -40,8 +20,6 @@ const FRAGMENT_SHADER_SRC: &str = r#"
         color = color_vec;
     }
 "#;
-
-
 
 impl SimRenderData<3> {
     pub(crate) fn from_simulation<
@@ -69,21 +47,33 @@ impl SimRenderData<3> {
             gl::Program::from_source(display, VERTEX_SHADER_SRC_3D, FRAGMENT_SHADER_SRC, None)
                 .unwrap();
 
-        let mut render_data = vec![];
+        let mut mirrors = vec![];
 
-        mirror
-            .append_render_data(display, List::from(&mut render_data));
+        mirror.append_render_data(display, List::from(&mut mirrors));
 
         let mut vertex_scratch = vec![];
 
-        Self::new(
-            Vec::from_iter(rays.into_iter().map(|ray| {
-                vertex_scratch.clear();
-                RayRenderData::from_ray(&mut vertex_scratch, mirror, ray, reflection_limit, display)
-            })),
-            render_data,
+        Self {
+            rays: rays
+                .into_iter()
+                .map(|ray| {
+                    vertex_scratch.clear();
+                    vertex_scratch.push(ray.origin.into());
+
+                    let path = RayPath::new(mirror, ray).map(Vertex::from);
+
+                    if let Some(n) = reflection_limit {
+                        vertex_scratch.extend(path.take(n))
+                    } else {
+                        vertex_scratch.extend(path)
+                    }
+
+                    gl::VertexBuffer::immutable(display, &vertex_scratch).unwrap()
+                })
+                .collect(),
+            mirrors,
             program,
-        )
+        }
     }
 }
 
@@ -113,21 +103,33 @@ impl SimRenderData<2> {
             gl::Program::from_source(display, VERTEX_SHADER_SRC_2D, FRAGMENT_SHADER_SRC, None)
                 .unwrap();
 
-        let mut render_data = vec![];
+        let mut mirrors = vec![];
 
-        mirror
-            .append_render_data(display, List::from(&mut render_data));
+        mirror.append_render_data(display, List::from(&mut mirrors));
 
         let mut vertex_scratch = vec![];
 
-        Self::new(
-            rays.into_iter().map(|ray| {
-                vertex_scratch.clear();
-                RayRenderData::from_ray(&mut vertex_scratch, mirror, ray, reflection_limit, display)
-            }).collect(),
-            render_data,
+        Self {
+            rays: rays
+                .into_iter()
+                .map(|ray| {
+                    vertex_scratch.clear();
+                    vertex_scratch.push(ray.origin.into());
+
+                    let path = RayPath::new(mirror, ray).map(Vertex::from);
+
+                    if let Some(n) = reflection_limit {
+                        vertex_scratch.extend(path.take(n))
+                    } else {
+                        vertex_scratch.extend(path)
+                    }
+
+                    gl::VertexBuffer::immutable(display, &vertex_scratch).unwrap()
+                })
+                .collect(),
+            mirrors,
             program,
-        )
+        }
     }
 }
 
@@ -279,10 +281,10 @@ where
             ..Default::default()
         };
 
-        for ray in &self.ray_render_data {
+        for ray in &self.rays {
             target
                 .draw(
-                    &ray.path,
+                    ray,
                     LINE_STRIP,
                     &self.program,
                     &gl::uniform! {
@@ -295,7 +297,7 @@ where
                 .unwrap();
         }
 
-        for render_data in self.mirror_render_data.iter().map(Box::as_ref) {
+        for render_data in self.mirrors.iter().map(Box::as_ref) {
             target
                 .draw(
                     render_data.vertices(),

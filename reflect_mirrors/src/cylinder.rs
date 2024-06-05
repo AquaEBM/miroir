@@ -154,22 +154,6 @@ impl JsonSer for CylindricalMirror {
     }
 }
 
-impl Random for CylindricalMirror {
-    fn random(rng: &mut (impl rand::Rng + ?Sized)) -> Self
-    where
-        Self: Sized,
-    {
-        loop {
-            if let Some(mirror) = Self::new(
-                [rand_vect(rng, 10.0), rand_vect(rng, 10.0)],
-                rng.gen::<Float>() * 4.0,
-            ) {
-                break mirror;
-            }
-        }
-    }
-}
-
 struct CylinderRenderData {
     vertices: gl::VertexBuffer<Vertex3D>,
 }

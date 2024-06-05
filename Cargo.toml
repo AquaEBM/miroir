@@ -1,11 +1,10 @@
 [workspace]
 
 members = [
-    "gen_rand_sim",
     "reflect",
     "reflect_glium",
     "reflect_json",
-    "reflect_mirrors", "reflect_random", 
+    "reflect_mirrors",
     "run_sim_json"
 ]
 

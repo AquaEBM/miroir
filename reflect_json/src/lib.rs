@@ -4,7 +4,7 @@ use std::error::Error;
 
 extern crate alloc;
 
-use alloc::{rc::Rc, sync::Arc, boxed::Box, vec::Vec, string::String};
+use alloc::{boxed::Box, rc::Rc, string::String, sync::Arc, vec::Vec};
 use core::ops::Deref;
 
 pub use serde_json;
@@ -167,7 +167,10 @@ impl<T: JsonDes> JsonDes for Vec<T> {
     }
 }
 
-pub fn serialize_simulation<const D: usize>(mirror: &(impl JsonSer + ?Sized), rays: impl IntoIterator<Item = Ray<D>>) -> serde_json::Value {
+pub fn serialize_simulation<const D: usize>(
+    mirror: &(impl JsonSer + ?Sized),
+    rays: impl IntoIterator<Item = Ray<D>>,
+) -> serde_json::Value {
     serde_json::json!({
         "dim": D,
         "mirror": mirror.to_json(),
@@ -175,10 +178,16 @@ pub fn serialize_simulation<const D: usize>(mirror: &(impl JsonSer + ?Sized), ra
     })
 }
 
-pub fn deserialize_simulation<const D: usize, M: JsonDes>(json: &serde_json::Value) -> Result<(M, Vec<Ray<D>>), Box<dyn Error>> {
-    let dim = json.get("dim").ok_or("dim field expected")?.as_u64().ok_or("dim field must be a positive integer")? as usize;
+pub fn deserialize_simulation<const D: usize, M: JsonDes>(
+    json: &serde_json::Value,
+) -> Result<(M, Vec<Ray<D>>), Box<dyn Error>> {
+    let dim = json
+        .get("dim")
+        .ok_or("dim field expected")?
+        .as_u64()
+        .ok_or("dim field must be a positive integer")? as usize;
     if dim != D {
-        return Err(format!("dimension must be {D}").into())
+        return Err(format!("dimension must be {D}").into());
     }
     Ok((
         M::from_json(json.get("mirror").ok_or("mirror field expected")?)?,

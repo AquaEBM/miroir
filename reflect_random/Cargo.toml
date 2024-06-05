@@ -1,9 +1,0 @@
-[package]
-name = "reflect_random"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-
-reflect = { path = "../reflect" }
-rand = "0.8"

@@ -1,4 +1,3 @@
-// use reflect::{Ray, Simulation};
 use reflect_json::{deserialize_simulation, serde_json, JsonType};
 use reflect_mirrors::*;
 
@@ -9,12 +8,6 @@ trait SimulationMirror<const D: usize>: reflect::Mirror<D> + reflect_glium::Open
 impl<const D: usize, T: reflect::Mirror<D> + reflect_glium::OpenGLRenderable + ?Sized>
     SimulationMirror<D> for T
 {
-}
-
-impl<const D: usize> reflect_json::JsonType for dyn SimulationMirror<D> {
-    fn json_type() -> String {
-        "dynamic".into()
-    }
 }
 
 fn boxed<'a, const D: usize, T: SimulationMirror<D> + 'a>(
@@ -71,7 +64,7 @@ impl reflect_json::JsonDes for Box<dyn SimulationMirror<2>> {
         let deserializers = DESERIALIZERS.get_or_init(|| HashMap::from([
             (
                 // recurse
-                <dyn SimulationMirror<2>>::json_type(),
+                "dynamic".into(),
                 (|value| Box::<dyn SimulationMirror<2>>::from_json(value).map(boxed)) as MirrorDeserializer<2>,
             ),
             (
@@ -107,7 +100,7 @@ impl reflect_json::JsonDes for Box<dyn SimulationMirror<3>> {
         let deserializers = DESERIALIZERS.get_or_init(|| HashMap::from([
             (
                 // recurse
-                <dyn SimulationMirror<3>>::json_type(),
+                "dynamic".into(),
                 (|json| Box::<dyn SimulationMirror<3>>::from_json(json).map(boxed)) as MirrorDeserializer<3>,
             ),
             (
@@ -128,7 +121,10 @@ impl reflect_json::JsonDes for Box<dyn SimulationMirror<3>> {
     }
 }
 
-fn run_simulation(reflection_cap: Option<usize>, json: &serde_json::Value) -> Result<(), Box<dyn Error>> {
+fn run_simulation(
+    reflection_cap: Option<usize>,
+    json: &serde_json::Value,
+) -> Result<(), Box<dyn Error>> {
     let dim = json
         .get("dim")
         .ok_or(r#"invalid json: expected a "dim" field"#)?

@@ -42,15 +42,13 @@ impl<const D: usize> SimulationCtx<D> {
     }
 
     #[inline]
-    fn next_ray<M: Mirror<D> + ?Sized>(&mut self, mirror: &M) -> Option<Ray<D>> {
+    fn next_ray<M: Mirror<D> + ?Sized>(&mut self, mirror: &M) -> Option<&Ray<D>> {
         mirror.add_tangents(self);
 
-        let ray = &mut self.ray;
-
-        self.closest.take().map(|(dist, dir_space)| {
-            ray.advance(dist);
-            ray.reflect_dir(&dir_space);
-            *ray
+        self.closest.take().map(move |(dist, dir_space)| {
+            self.ray.advance(dist);
+            self.ray.reflect_dir(&dir_space);
+            &self.ray
         })
     }
 }
@@ -84,39 +82,39 @@ impl<const D: usize> Ray<D> {
     }
 }
 
-/// An affine hyperplane
+/// A hyperplane
 #[derive(Clone, Debug, PartialEq)]
-pub struct AffineHyperPlaneBasis<const D: usize> {
+pub struct HyperPlaneBasis<const D: usize> {
     /// See [`AffineHyperPlane::new`] for info on the layout of this field
     vectors: [SVector<Float, D>; D],
 }
 
-impl<const D: usize> AffineHyperPlaneBasis<D> {
-    /// The first element of the `vectors` array is the plane's "starting point" (i. e. `v0`).
+impl<const D: usize> HyperPlaneBasis<D> {
+    /// The first element of the `vectors` can be completely arbitrary and will be ignored
     ///
-    /// The remaining `N-1` vectors are a free family spanning it's direction hyperplane
+    /// The remaining `D - 1` vectors are a free family spanning this hyperplane
     ///
-    /// Returns `None` if the provided family isn't free.
+    /// Returns `None` if the family isn't free.
     ///
-    /// Note that an expression like `[T ; N - 1]` is locked under `#[feature(const_generic_exprs)]`.
+    /// Note that an expression like `[T ; D - 1]` is locked under `#[feature(const_generic_exprs)]`.
     #[inline]
-    pub fn new(vectors: [SVector<Float, D>; D]) -> Option<(Self, AffineHyperPlaneBasisOrtho<D>)> {
+    pub fn new(vectors: [SVector<Float, D>; D]) -> Option<(Self, HyperPlaneBasisOrtho<D>)> {
         let mut orthonormalized = vectors;
         (SVector::orthonormalize(&mut orthonormalized[1..]) == D - 1).then_some((
             Self { vectors },
-            AffineHyperPlaneBasisOrtho {
+            HyperPlaneBasisOrtho {
                 vectors: orthonormalized,
             },
         ))
     }
 
-    /// A reference to the plane's starting point
+    /// A reference to the unused first vector in the array.
     #[inline]
     pub fn v0(&self) -> &SVector<Float, D> {
-        self.vectors.first().unwrap()
+        &self.vectors[0]
     }
 
-    /// A mutable reference to the plane's starting point
+    /// A mutable reference to the unused first vector in the array.
     #[inline]
     pub fn v0_mut(&mut self) -> &mut SVector<Float, D> {
         &mut self.vectors[0]
@@ -136,7 +134,8 @@ impl<const D: usize> AffineHyperPlaneBasis<D> {
     }
 
     /// Returns a vector `[t_1, ..., t_d]` whose coordinates represent
-    /// the `intersection` of the given `ray` and `self`.
+    /// the `intersection` of the given `ray` and the affine hyperplane
+    /// starting at `v0` whose direction space is `self`.
     ///
     /// If it exists, the following holds:
     ///
@@ -149,7 +148,7 @@ impl<const D: usize> AffineHyperPlaneBasis<D> {
     pub fn intersection_coordinates(
         &self,
         ray: &Ray<D>,
-        starting_pt: &SVector<Float, D>,
+        v0: &SVector<Float, D>,
     ) -> Option<SVector<Float, D>> {
         let mut a = SMatrix::<Float, D, D>::from_columns(&self.vectors);
         a.set_column(0, ray.direction.as_ref());
@@ -157,7 +156,7 @@ impl<const D: usize> AffineHyperPlaneBasis<D> {
         a.try_inverse_mut()
             // a now contains a^-1
             .then(|| {
-                let mut v = a * (ray.origin - starting_pt);
+                let mut v = a * (ray.origin - v0);
                 let first = &mut v[0];
                 *first = -*first;
                 v
@@ -165,28 +164,28 @@ impl<const D: usize> AffineHyperPlaneBasis<D> {
     }
 }
 
+/// A hyperplane, like [`HyperPlaneBasis`], but the basis stored is garanteed
+/// to be orthonormal, efficiently enabling projections and symmetries.
 #[derive(Clone, Debug, PartialEq)]
-/// An affine hyperplane, like [`AffineHyperPlane`], but the basis stored is garanteed
-/// to be orthonormal, enabling projections and symmetries efficiently.
-pub struct AffineHyperPlaneBasisOrtho<const D: usize> {
-    /// See [`AffineHyperPlane::new`] for info on the layout of this field
+pub struct HyperPlaneBasisOrtho<const D: usize> {
+    /// See [`HyperPlaneBasis::new`] for info on the layout of this field
     vectors: [SVector<Float, D>; D],
 }
 
-impl<const D: usize> AffineHyperPlaneBasisOrtho<D> {
-    /// A reference to the plane's starting point
+impl<const D: usize> HyperPlaneBasisOrtho<D> {
+    /// A reference to the unused first vector in the array.
     #[inline]
     pub fn v0(&self) -> &SVector<Float, D> {
-        self.vectors.first().unwrap()
+        &self.vectors[0]
     }
 
-    /// A mutable reference to the plane's starting point
+    /// A mutable reference to the unused first vector in the array.
     #[inline]
     pub fn v0_mut(&mut self) -> &mut SVector<Float, D> {
         &mut self.vectors[0]
     }
 
-    /// A reference to an orthonormal basis of the plane's direction hyperplane.
+    /// A reference to an orthonormal basis of `self`
     ///
     /// The returned slice is garanteed to be of length `D - 1`.
     #[inline]
@@ -194,35 +193,39 @@ impl<const D: usize> AffineHyperPlaneBasisOrtho<D> {
         &self.vectors[1..]
     }
 
-    /// Returns the orthogonal projection of `v` w.r.t. this plane's direction subspace.
+    /// Returns the orthogonal projection of `v` w.r.t. `self`
     #[inline]
-    pub fn orthogonal_projection(&self, v: SVector<Float, D>) -> SVector<Float, D> {
+    pub fn project(&self, v: SVector<Float, D>) -> SVector<Float, D> {
         self.basis().iter().map(|e| v.dot(e) * e).sum()
     }
 
     /// Returns the point in this plane whose distance with `p` is smallest.
     #[inline]
-    pub fn orthogonal_point_projection(&self, p: SVector<Float, D>) -> SVector<Float, D> {
-        let v0 = self.v0();
+    pub fn closest_point_to_plane(
+        &self,
+        v0: &SVector<Float, D>,
+        p: SVector<Float, D>,
+    ) -> SVector<Float, D> {
         let v = p - v0;
-        v0 + self.orthogonal_projection(v)
+        v0 + self.project(v)
     }
 
     /// Returns a vector `[t_1, ..., t_d]` whose coordinates represent
-    /// the `intersection` of the given `ray` and `self`.
+    /// the `intersection` of the given `ray` and the affine hyperplane
+    /// starting at `v0` whose direction space is `self`.
     ///
     /// If it exists, the following holds:
     ///
     /// `intersection = ray.origin + t_1 * ray.direction` and,
     ///
-    /// let `[v_2, ..., v_d]` be the orthonormal basis of `self`'s direction space ( returned by `self.basis()`)
+    /// let `[v_2, ..., v_d]` be the orthonormal basis of `self` returned by `self.basis()`
     ///
-    /// `interserction = plane.origin + sum for k in [2 ; n] t_k * v_k`
+    /// `interserction = v0 + sum for k in [2 ; n] t_k * v_k`
     #[inline]
     pub fn intersection_coordinates(
         &self,
         ray: &Ray<D>,
-        starting_pt: &SVector<Float, D>,
+        v0: &SVector<Float, D>,
     ) -> Option<SVector<Float, D>> {
         let mut a = SMatrix::<Float, D, D>::from_columns(&self.vectors);
         a.set_column(0, ray.direction.as_ref());
@@ -230,7 +233,7 @@ impl<const D: usize> AffineHyperPlaneBasisOrtho<D> {
         a.try_inverse_mut()
             // a now contains a^-1
             .then(|| {
-                let mut v = a * (ray.origin - starting_pt);
+                let mut v = a * (ray.origin - v0);
                 let first = &mut v[0];
                 *first = -*first;
                 v
@@ -238,22 +241,19 @@ impl<const D: usize> AffineHyperPlaneBasisOrtho<D> {
     }
 }
 
+/// Different ways of representing a hyperplane
 #[derive(Clone, Debug, PartialEq)]
-/// Different ways of representing a hyperplane in `D`-dimensional euclidean space
 pub enum HyperPlane<const D: usize> {
-    /// Only the basis of this object's direction hyperplane is used.
-    ///
-    /// The starting point will be ignored and can be arbitrary.
-    Plane(AffineHyperPlaneBasisOrtho<D>),
+    Plane(HyperPlaneBasisOrtho<D>),
     Normal(Unit<SVector<Float, D>>),
 }
 
 impl<const D: usize> HyperPlane<D> {
     /// Reflect a vector w.r.t this hyperplane
     #[inline]
-    pub fn reflect(&self, v: SVector<Float, D>) -> SVector<Float, D> {
+    pub(crate) fn reflect(&self, v: SVector<Float, D>) -> SVector<Float, D> {
         match self {
-            HyperPlane::Plane(plane) => 2.0 * plane.orthogonal_projection(v) - v,
+            HyperPlane::Plane(plane) => 2.0 * plane.project(v) - v,
             HyperPlane::Normal(normal) => {
                 let n = normal.as_ref();
                 v - 2.0 * v.dot(n) * n
@@ -263,32 +263,36 @@ impl<const D: usize> HyperPlane<D> {
 
     /// Reflect a unit vector w.r.t. this hyperplane
     #[inline]
-    pub fn reflect_unit(&self, v: Unit<SVector<Float, D>>) -> Unit<SVector<Float, D>> {
+    pub(crate) fn reflect_unit(&self, v: Unit<SVector<Float, D>>) -> Unit<SVector<Float, D>> {
         // SAFETY: orthogonal symmetry preserves euclidean norms
         // This function is supposed to be unsafe, why nalgebra? why?
         Unit::new_unchecked(self.reflect(v.into_inner()))
     }
 
-    /// Return the distance `t` such that `ray.at(t)` intersects with the affine hyperplane
-    /// whose direction space is `self`, and whose starting point is `p`.
+    /// Return the distance `t` such that `ray.at(t)` intersects with the affine
+    /// hyperplane starting at `v0`, and whose direction space is `self`.
     ///
     /// Returns `None` if `ray` is parallel to `self`
     #[inline]
-    pub fn try_ray_intersection(&self, p: &SVector<Float, D>, ray: &Ray<D>) -> Option<Float> {
+    pub(crate) fn try_ray_intersection(
+        &self,
+        v0: &SVector<Float, D>,
+        ray: &Ray<D>,
+    ) -> Option<Float> {
         match self {
-            HyperPlane::Plane(plane) => plane.intersection_coordinates(ray, p).map(|v| v[0]),
+            HyperPlane::Plane(plane) => plane.intersection_coordinates(ray, v0).map(|v| v[0]),
             HyperPlane::Normal(normal) => {
                 let u = ray.direction.dot(normal);
-                (u.abs() > Float::EPSILON).then(|| (p - ray.origin).dot(normal) / u)
+                (u.abs() > Float::EPSILON).then(|| (v0 - ray.origin).dot(normal) / u)
             }
         }
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
 /// Different ways of representing a starting point of an affine hyperplane in `D`-dimensional euclidean space
 ///
 /// It may be provided directly or be at a certain distance from a ray.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Intersection<const D: usize> {
     /// If a [`Mirror`] returns `Intersection::Distance(t)` when calculating it's intersections with a `ray`, then `ray.at(t)` belongs to the returned tangent (hyper)plane.
     ///
@@ -306,23 +310,11 @@ pub struct Plane<const D: usize> {
 }
 
 impl<const D: usize> Plane<D> {
-    /// Reflect a vector w.r.t this tangent plane's direction hyperplane
-    #[inline]
-    pub fn reflect(&self, v: SVector<Float, D>) -> SVector<Float, D> {
-        self.direction.reflect(v)
-    }
-
-    /// Reflect a unit vector w.r.t. this tangent plane's direction hyperplane
-    #[inline]
-    pub fn reflect_unit(&self, v: Unit<SVector<Float, D>>) -> Unit<SVector<Float, D>> {
-        self.direction.reflect_unit(v)
-    }
-
     /// Return the distance `t` such that `ray.at(t)` intersects with this tangent plane
     ///
     /// Returns `None` if `ray` is parallel to `self`
     #[inline]
-    pub fn try_ray_intersection(&self, ray: &Ray<D>) -> Option<Float> {
+    pub(crate) fn try_ray_intersection(&self, ray: &Ray<D>) -> Option<Float> {
         match &self.intersection {
             Intersection::Distance(t) => Some(*t),
             Intersection::StartingPoint(p) => self.direction.try_ray_intersection(p, ray),
@@ -344,15 +336,15 @@ impl<const D: usize> Plane<D> {
 /// Running simulations with mirrors in 0 dimensions will cause panics or return unspecified
 /// results.
 ///
-// `D` could have been an associated constant but, lack of
-// `#[feature(generic_const_exprs)]` screws us over, once again.
+/// `D` could have been an associated constant, but, lack of
+/// `#[feature(generic_const_exprs)]` makes this difficult
 pub trait Mirror<const D: usize> {
     /// Adds the tangents to this mirror, at the
     /// points of intersection between it and the `ray`, in no particular order.
     ///
-    /// Tangents can be added with `ctx.add_tangent(...)`.
-    /// 
-    /// The `ray` can be accessed through [`ctx.ray() `](SimulationCtx::ray).
+    /// Tangents can be added with [`ctx.add_tangent(...)`](SimulationCtx::add_tangent).
+    ///
+    /// The `ray` can be accessed through [`ctx.ray( )`](SimulationCtx::ray).
     ///
     /// The ray is expected to "bounce" off the plane closest to it.
     ///
@@ -412,7 +404,7 @@ impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Rc<T> {
 impl<const D: usize, T: Mirror<D>> Mirror<D> for Vec<T> {
     #[inline]
     fn add_tangents(&self, ctx: &mut SimulationCtx<D>) {
-        self.deref().add_tangents(ctx)
+        self.as_slice().add_tangents(ctx)
     }
 }
 
@@ -430,35 +422,41 @@ impl<'a, const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for &'a mut T {
     }
 }
 
-pub struct RayPathIter<'a, const D: usize, M: ?Sized> {
+pub struct RayPath<'a, const D: usize, M: ?Sized> {
     pub(crate) ctx: SimulationCtx<D>,
     pub(crate) mirror: &'a M,
 }
 
-impl<'a, const D: usize, M: Mirror<D> + ?Sized> Iterator for RayPathIter<'a, D, M> {
+impl<'a, const D: usize, M: Mirror<D> + ?Sized> RayPath<'a, D, M> {
+    #[inline]
+    pub fn new(mirror: &'a M, ray: Ray<D>) -> Self {
+        Self {
+            ctx: SimulationCtx::new(ray),
+            mirror,
+        }
+    }
+
+    #[inline]
+    pub fn current_ray_dir(&self) -> Unit<SVector<Float, D>> {
+        self.ctx.ray.direction
+    }
+}
+
+impl<'a, const D: usize, M: Mirror<D> + ?Sized> Iterator for RayPath<'a, D, M> {
     type Item = SVector<Float, D>;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.ctx.next_ray(self.mirror).map(|ray| ray.origin)
     }
 }
 
-impl<'a, const D: usize, M: Mirror<D> + ?Sized> RayPathIter<'a, D, M> {
-    pub fn ray_dir(&self) -> Unit<SVector<Float, D>> {
-        self.ctx.ray.direction
-    }
-}
-
 #[inline]
-pub fn get_ray_path<const D: usize, M: Mirror<D> + ?Sized>(
-    mirror: &M,
-    ray: Ray<D>,
-) -> RayPathIter<D, M> {
-    RayPathIter { ctx: SimulationCtx::new(ray), mirror }
-}
-
-#[inline]
-pub fn loop_index<const D: usize>(path: &[SVector<Float, D>], pt: SVector<Float, D>, e: Float) -> Option<usize> {
+pub fn loop_index<const D: usize>(
+    path: &[SVector<Float, D>],
+    pt: SVector<Float, D>,
+    e: Float,
+) -> Option<usize> {
     path.split_last().and_then(|(last_pt, points)| {
         points.windows(2).enumerate().find_map(|(i, window)| {
             // ugly, but `slice::array_windows` is unstable

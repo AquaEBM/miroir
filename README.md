@@ -4,7 +4,7 @@ A minimal yet powerful library for ray reflection simulation in Rust.
 
 Requires the latest stable version of the [Rust Compiler](https://www.rust-lang.org/tools/install)
 
-Uses [nalgebra](https://nalgebra.org/) for general computation.
+Uses [`nalgebra`](https://nalgebra.org/) for general computation.
 
 ## Crates
 
@@ -16,7 +16,6 @@ There are integrations extending this library with more functionality such as:
 
 - `reflect_glium` Which enables running and visualising 2D and 3D simulations using OpenGL.
 - `reflect_json` Which enables serialisation/deserialisation of simulation data with the JSON format. Some example simulations in their JSON representation can be found in the `assets` directory.
-- `reflect_random` Which exposes a simple trait for generating reflective surfaces randomly, for quick and dirty testing.
 
 Other third-party integrations can easily be created over the simple API of the `reflect` crate. It is advised to check it's documentation:
 
@@ -24,38 +23,10 @@ Other third-party integrations can easily be created over the simple API of the 
 cargo doc -p reflect --no-deps --open
 ```
 
-The binary crate `gen_rand_sim` can generate random simulations and serialise them to JSON, using `reflect_json` and `reflect_random`:
-
-```shell
-cargo run -r -p gen_rand_sim "<path/to/file.json>" [dimensions=2] [num_mirrors=12] [num_rays=4]
-```
-
 The binary crate `run_sim_json` can deserialise, run, then view simulations using `reflect_glium` and `reflect_json`:
 
 ```shell
-cargo run -r -p run_sim_json "<path/to/simulation.json>" [max_reflection_count=1000]
-```
-
-## Flutter GUI App
-
-The `mirror_verse_ui` GUI App, built with [Flutter](https://flutter.dev/), serves as a simple way to view the simulation JSON files in the `assets` directory, run them with `run_sim_json`, as well as generate ones randomly with `gen_rand_sim`, all in one single place. Here's how to run it:
-
-First, build the binaries and move them to the Flutter `assets` directory:
-
-- Linux/MacOS
-
-```shell
-cargo build -r && \
-cp target/release/generate_random_simulation_3d mirror_verse_ui/assets && \
-cp target/release/run_simulation_json_3d mirror_verse_ui/assets
-```
-
-- Windows:
-
-```shell
-cargo build -r
-copy "target\release\generate_random_simulation_3d.exe mirror_verse_ui\assets"
-copy "target\release\run_simulation_json_3d.exe mirror_verse_ui\assets"
+cargo run -r -p run_sim_json "<path/to/simulation.json>" [max_reflection_count]
 ```
 
 You can now run the app with:
@@ -67,7 +38,7 @@ flutter run --release
 
 ### Controls for `reflect_glium`
 
-The `reflect_glium` binary crate (which is run by `mirror_verse_ui`) allows viewing simulations where you can move around and rotate the camera. Here are the controls:
+The `reflect_glium` binary crate allows viewing simulations where you can move around and rotate the camera. Here are the controls:
 
 - Use the WASD keys (or ZQSD) to move forward, left, backward, and right, respectively.
 - Use the space bar to move up and the shift key to move down.

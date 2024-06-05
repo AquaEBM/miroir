@@ -29,13 +29,6 @@ The binary crate `run_sim_json` can deserialise, run, then view simulations usin
 cargo run -r -p run_sim_json "<path/to/simulation.json>" [max_reflection_count]
 ```
 
-You can now run the app with:
-
-```shell
-cd mirror_verse_ui
-flutter run --release
-```
-
 ### Controls for `reflect_glium`
 
 The `reflect_glium` binary crate allows viewing simulations where you can move around and rotate the camera. Here are the controls:

@@ -41,14 +41,15 @@ impl<const D: usize> SimulationCtx<D> {
     }
 
     #[inline]
-    fn next_ray<M: Mirror<D> + ?Sized>(&mut self, mirror: &M) -> Option<&Ray<D>> {
+    fn update_ray<M: Mirror<D> + ?Sized>(&mut self, mirror: &M) -> bool {
         mirror.add_tangents(self);
 
-        self.closest.take().map(|(dist, dir_space)| {
+        if let Some((dist, dir_space)) = self.closest.take() {
             self.ray.advance(dist);
             self.ray.reflect_dir(&dir_space);
-            &self.ray
-        })
+            return true;
+        }
+        false
     }
 }
 
@@ -250,7 +251,7 @@ pub enum HyperPlane<const D: usize> {
 impl<const D: usize> HyperPlane<D> {
     /// Reflect a vector w.r.t this hyperplane
     #[inline]
-    pub(crate) fn reflect(&self, v: SVector<Float, D>) -> SVector<Float, D> {
+    pub fn reflect(&self, v: SVector<Float, D>) -> SVector<Float, D> {
         match self {
             Self::Plane(plane) => 2.0 * plane.project(v) - v,
             Self::Normal(normal) => {
@@ -262,7 +263,7 @@ impl<const D: usize> HyperPlane<D> {
 
     /// Reflect a unit vector w.r.t. this hyperplane
     #[inline]
-    pub(crate) fn reflect_unit(&self, v: Unit<SVector<Float, D>>) -> Unit<SVector<Float, D>> {
+    pub fn reflect_unit(&self, v: Unit<SVector<Float, D>>) -> Unit<SVector<Float, D>> {
         // SAFETY: orthogonal symmetry preserves euclidean norms
         // This function is supposed to be unsafe, why nalgebra? why?
         Unit::new_unchecked(self.reflect(v.into_inner()))
@@ -273,7 +274,7 @@ impl<const D: usize> HyperPlane<D> {
     ///
     /// Returns `None` if `ray` is parallel to `self`
     #[inline]
-    pub(crate) fn try_ray_intersection(
+    pub fn try_ray_intersection(
         &self,
         v0: &SVector<Float, D>,
         ray: &Ray<D>,
@@ -313,7 +314,7 @@ impl<const D: usize> Plane<D> {
     ///
     /// Returns `None` if `ray` is parallel to `self`
     #[inline]
-    pub(crate) fn try_ray_intersection(&self, ray: &Ray<D>) -> Option<Float> {
+    pub fn try_ray_intersection(&self, ray: &Ray<D>) -> Option<Float> {
         match &self.intersection {
             Intersection::Distance(t) => Some(*t),
             Intersection::StartingPoint(p) => self.direction.try_ray_intersection(p, ray),
@@ -436,8 +437,8 @@ impl<'a, const D: usize, M: Mirror<D> + ?Sized> RayPath<'a, D, M> {
     }
 
     #[inline]
-    pub const fn current_ray_dir(&self) -> Unit<SVector<Float, D>> {
-        self.ctx.ray.direction
+    pub const fn current_ray(&self) -> &Ray<D> {
+        self.ctx.ray()
     }
 }
 
@@ -446,7 +447,7 @@ impl<'a, const D: usize, M: Mirror<D> + ?Sized> Iterator for RayPath<'a, D, M> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.ctx.next_ray(self.mirror).map(|ray| ray.origin)
+        self.ctx.update_ray(self.mirror).then(|| self.ctx.ray().origin)
     }
 }
 

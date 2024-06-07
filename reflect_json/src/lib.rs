@@ -28,7 +28,7 @@ pub fn json_array_to_vector<const D: usize>(
     json_array_to_float_array(json_array).map(SVector::from)
 }
 
-pub fn map_json_array<T, C: FromIterator<T>>(
+pub fn map_json_array<C: FromIterator<T>, T>(
     json: &serde_json::Value,
     map: impl FnMut(&serde_json::Value) -> Result<T, Box<dyn Error>>,
 ) -> Result<C, Box<dyn Error>> {

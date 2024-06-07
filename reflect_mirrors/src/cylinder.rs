@@ -28,7 +28,7 @@ impl CylindricalMirror {
         })
     }
 
-    pub fn segment_dist(&self) -> SVector<Float, 3> {
+    pub const fn segment_dist(&self) -> SVector<Float, 3> {
         self.dist
     }
 
@@ -36,7 +36,7 @@ impl CylindricalMirror {
         [self.start, self.start + self.dist]
     }
 
-    pub fn radius(&self) -> Float {
+    pub const fn radius(&self) -> Float {
         self.radius
     }
 
@@ -65,10 +65,10 @@ impl Mirror<3> for CylindricalMirror {
         let pd = p(d);
 
         let a = (d - pd).norm_squared();
-        let b = m.dot(&d) - 2.0 * d.dot(&pm) + pm.dot(&pd);
+        let b = d.dot(&pm).mul_add(-2.0, pm.dot(&pd) + m.dot(&d));
         let c = (m - pm).norm_squared() - self.radius_sq;
 
-        let delta = b * b - a * c;
+        let delta = c.mul_add(-a, b * b);
 
         if delta > Float::EPSILON {
             let root_delta = delta.sqrt();
@@ -134,7 +134,7 @@ impl JsonDes for CylindricalMirror {
             .ok_or("Failed to parse radius")? as Float;
 
         Self::new([start, end], radius)
-            .ok_or("radius is too small or start and end vectors are too close".into())
+            .ok_or_else(|| "radius is too small or start and end vectors are too close".into())
     }
 }
 
@@ -176,32 +176,35 @@ impl OpenGLRenderable for CylindricalMirror {
 
         let d = self.segment_dist().map(|s| s as f32);
 
-        let b = d.normalize();
+        let d_norm = d.normalize();
 
-        let k = nalgebra::SVector::from([0.0, 0.0, 1.0]) + b;
+        let v = nalgebra::SVector::from([0.0, 0.0, 1.0]) + d_norm;
 
         // Rotation matrix to rotate the circle so it faces the axis formed by our line segment
         // specifically it is the orthogonal matrix that maps the unit `z` vector `a = [0, 0, 1]`
-        // to `b`, let `v = a + b`, let `O = (v * vT) / (vT * v) or v ⊗ v / <v, v>`
-        // (outer product divided by the inner product)
+        // to a unit vector `b`, let `v = a + b`, and vT be the transpose of v, also,
+        // let `O = (v * vT) / (vT * v), or v ⊗ v / <v, v>` (outer product over inner product)
         // Then, `R = 2 * O - Id`
-        let rot =
-            2.0 / k.norm_squared() * k.kronecker(&k.transpose()) - nalgebra::SMatrix::identity();
+        let id = nalgebra::SMatrix::identity();
+        let o = nalgebra::SMatrix::from_fn(|i, j| v[i] * v[j]);
+        let rot = 2.0 / v.norm_squared() * o - id;
 
         let r = self.radius() as f32;
         let start = self.line_segment()[0].map(|s| s as f32);
 
         use core::f32::consts::TAU;
 
-        let vertices: Vec<_> = (0..=NUM_POINTS)
+        let mut vertices: Vec<_> = (0..NUM_POINTS)
             .flat_map(|i| {
                 let [x, y]: [f32; 2] = (i as f32 / NUM_POINTS as f32 * TAU).sin_cos().into();
                 let vertex = [x * r, y * r, 0.0];
-                let v = rot * nalgebra::SVector::from(vertex) + start;
-                [v, v + d]
+                let k = rot * nalgebra::SVector::from(vertex) + start;
+                [k, k + d]
             })
             .map(Vertex3D::from)
             .collect();
+
+        vertices.extend_from_within(..2);
 
         let vertices = gl::VertexBuffer::immutable(display, vertices.as_slice()).unwrap();
 

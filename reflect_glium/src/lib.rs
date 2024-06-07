@@ -61,28 +61,18 @@ fn default_display_event_loop() -> (glutin::event_loop::EventLoop<()>, gl::Displ
     (el, display)
 }
 
-pub fn run_2d<M: Mirror<2> + OpenGLRenderable + ?Sized, R: IntoIterator<Item = Ray<2>>>(
+pub fn run_simulation<const D: usize, M: Mirror<D> + OpenGLRenderable + ?Sized, R: IntoIterator<Item = Ray<D>>>(
     mirror: &M,
     rays: R,
     reflection_limit: Option<usize>,
-) {
+)
+where
+    Vertex<D>: gl::Vertex,
+{
     let (el, display) = default_display_event_loop();
 
     let drawable_simulation =
-        SimRenderData::<2>::from_simulation(mirror, rays, reflection_limit, &display);
-
-    drawable_simulation.run(display, el);
-}
-
-pub fn run_3d<M: Mirror<3> + OpenGLRenderable + ?Sized, R: IntoIterator<Item = Ray<3>>>(
-    mirror: &M,
-    rays: R,
-    reflection_limit: Option<usize>,
-) {
-    let (el, display) = default_display_event_loop();
-
-    let drawable_simulation =
-        SimRenderData::<3>::from_simulation(mirror, rays, reflection_limit, &display);
+        SimRenderData::from_simulation(mirror, rays, reflection_limit, &display);
 
     drawable_simulation.run(display, el);
 }

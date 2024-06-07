@@ -10,11 +10,13 @@ pub struct PlaneMirror<const D: usize> {
 }
 
 impl<const D: usize> PlaneMirror<D> {
+    #[inline]
     pub fn try_new(vectors: [SVector<Float, D>; D]) -> Option<Self> {
         vectors.try_into().ok()
     }
 
-    pub fn inner_plane(&self) -> &HyperPlaneBasis<D> {
+    #[inline]
+    pub const fn inner_plane(&self) -> &HyperPlaneBasis<D> {
         &self.plane
     }
 }
@@ -22,6 +24,7 @@ impl<const D: usize> PlaneMirror<D> {
 impl<const D: usize> TryFrom<[SVector<Float, D>; D]> for PlaneMirror<D> {
     type Error = ();
 
+    #[inline]
     fn try_from(vectors: [SVector<Float, D>; D]) -> Result<Self, Self::Error> {
         HyperPlaneBasis::new(vectors)
             .map(|(plane, orthonormalised)| Self {
@@ -33,6 +36,7 @@ impl<const D: usize> TryFrom<[SVector<Float, D>; D]> for PlaneMirror<D> {
 }
 
 impl<const D: usize> PlaneMirror<D> {
+    #[inline]
     pub fn vertices(&self) -> impl Iterator<Item = SVector<Float, D>> + '_ {
         let basis = self.inner_plane().basis();
         let v0 = *self.inner_plane().v0();
@@ -116,7 +120,7 @@ impl<const D: usize> JsonDes for PlaneMirror<D> {
                 .ok_or("Failed to parse basis vector")?;
         }
 
-        Self::try_new(vectors).ok_or("the provided family of vectors must be free".into())
+        Self::try_new(vectors).ok_or_else(|| "the provided family of vectors must be free".into())
     }
 }
 

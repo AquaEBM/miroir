@@ -27,7 +27,7 @@ impl Camera {
         }
     }
 
-    pub fn calc_matrix(&self) -> [[f32; 4]; 4] {
+    pub fn calc_matrix(&self) -> Matrix4<f32> {
         let (sin_pitch, cos_pitch) = self.pitch.0.sin_cos();
         let (sin_yaw, cos_yaw) = self.yaw.0.sin_cos();
 
@@ -39,7 +39,6 @@ impl Camera {
             target,
             up,
         )
-        .into()
     }
 }
 
@@ -71,8 +70,8 @@ impl Projection {
         self.aspect = width as f32 / height as f32;
     }
 
-    pub fn get_matrix(&self) -> [[f32; 4]; 4] {
-        cgmath::perspective(self.fov_y, self.aspect, self.z_near, self.z_far).into()
+    pub fn get_matrix(&self) -> Matrix4<f32> {
+        cgmath::perspective(self.fov_y, self.aspect, self.z_near, self.z_far)
     }
 }
 
@@ -92,7 +91,7 @@ pub struct CameraController {
 }
 
 impl CameraController {
-    pub fn new(speed: f32, mouse_sensitivity: f32) -> Self {
+    pub const fn new(speed: f32, mouse_sensitivity: f32) -> Self {
         Self {
             amount_left: 0.,
             amount_right: 0.,

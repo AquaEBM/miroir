@@ -1245,6 +1245,7 @@ dependencies = [
  "glium",
  "glium_shapes",
  "reflect",
+ "reflect_mirrors",
 ]
 
 [[package]]

@@ -36,7 +36,7 @@ fn deserialize_boxed<const D: usize>(
         .ok_or(f!("invalid_mirror_type: {mirror_type}"))?;
 
     if mirror_type.starts_with("[]") {
-        reflect_json::map_json_array::<_, Vec<Box<dyn SimulationMirror<D>>>>(
+        reflect_json::map_json_array::<Vec<_>, _>(
             mirror_json,
             deserializer,
         )
@@ -133,9 +133,9 @@ fn run_simulation(
 
     match dim {
         2 => deserialize_simulation::<2, Box<dyn SimulationMirror<2>>>(json)
-            .map(|(mirror, rays)| reflect_glium::run_2d(&mirror, rays, reflection_cap)),
+            .map(|(mirror, rays)| reflect_glium::run_simulation(&mirror, rays, reflection_cap)),
         3 => deserialize_simulation::<3, Box<dyn SimulationMirror<3>>>(json)
-            .map(|(mirror, rays)| reflect_glium::run_3d(&mirror, rays, reflection_cap)),
+            .map(|(mirror, rays)| reflect_glium::run_simulation(&mirror, rays, reflection_cap)),
         _ => Err("dimension must be 2 or 3".into()),
     }
 }

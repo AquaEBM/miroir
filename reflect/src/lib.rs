@@ -19,16 +19,15 @@ pub struct SimulationCtx<const D: usize> {
 
 impl<const D: usize> SimulationCtx<D> {
     #[inline]
-    fn new(ray: Ray<D>) -> Self {
+    const fn new(ray: Ray<D>) -> Self {
         Self { ray, closest: None }
     }
 
     #[inline]
-    pub fn ray(&self) -> &Ray<D> {
+    pub const fn ray(&self) -> &Ray<D> {
         &self.ray
     }
 
-    #[inline]
     pub fn add_tangent(&mut self, tangent: Plane<D>) {
         let d = tangent
             .try_ray_intersection(self.ray())
@@ -45,7 +44,7 @@ impl<const D: usize> SimulationCtx<D> {
     fn next_ray<M: Mirror<D> + ?Sized>(&mut self, mirror: &M) -> Option<&Ray<D>> {
         mirror.add_tangents(self);
 
-        self.closest.take().map(move |(dist, dir_space)| {
+        self.closest.take().map(|(dist, dir_space)| {
             self.ray.advance(dist);
             self.ray.reflect_dir(&dir_space);
             &self.ray
@@ -110,7 +109,7 @@ impl<const D: usize> HyperPlaneBasis<D> {
 
     /// A reference to the unused first vector in the array.
     #[inline]
-    pub fn v0(&self) -> &SVector<Float, D> {
+    pub const fn v0(&self) -> &SVector<Float, D> {
         &self.vectors[0]
     }
 
@@ -129,7 +128,7 @@ impl<const D: usize> HyperPlaneBasis<D> {
     }
 
     #[inline]
-    pub fn vectors_raw(&self) -> &[SVector<Float, D>; D] {
+    pub const fn vectors_raw(&self) -> &[SVector<Float, D>; D] {
         &self.vectors
     }
 
@@ -175,7 +174,7 @@ pub struct HyperPlaneBasisOrtho<const D: usize> {
 impl<const D: usize> HyperPlaneBasisOrtho<D> {
     /// A reference to the unused first vector in the array.
     #[inline]
-    pub fn v0(&self) -> &SVector<Float, D> {
+    pub const fn v0(&self) -> &SVector<Float, D> {
         &self.vectors[0]
     }
 
@@ -253,8 +252,8 @@ impl<const D: usize> HyperPlane<D> {
     #[inline]
     pub(crate) fn reflect(&self, v: SVector<Float, D>) -> SVector<Float, D> {
         match self {
-            HyperPlane::Plane(plane) => 2.0 * plane.project(v) - v,
-            HyperPlane::Normal(normal) => {
+            Self::Plane(plane) => 2.0 * plane.project(v) - v,
+            Self::Normal(normal) => {
                 let n = normal.as_ref();
                 v - 2.0 * v.dot(n) * n
             }
@@ -280,8 +279,8 @@ impl<const D: usize> HyperPlane<D> {
         ray: &Ray<D>,
     ) -> Option<Float> {
         match self {
-            HyperPlane::Plane(plane) => plane.intersection_coordinates(ray, v0).map(|v| v[0]),
-            HyperPlane::Normal(normal) => {
+            Self::Plane(plane) => plane.intersection_coordinates(ray, v0).map(|v| v[0]),
+            Self::Normal(normal) => {
                 let u = ray.direction.dot(normal);
                 (u.abs() > Float::EPSILON).then(|| (v0 - ray.origin).dot(normal) / u)
             }
@@ -429,7 +428,7 @@ pub struct RayPath<'a, const D: usize, M: ?Sized> {
 
 impl<'a, const D: usize, M: Mirror<D> + ?Sized> RayPath<'a, D, M> {
     #[inline]
-    pub fn new(mirror: &'a M, ray: Ray<D>) -> Self {
+    pub const fn new(mirror: &'a M, ray: Ray<D>) -> Self {
         Self {
             ctx: SimulationCtx::new(ray),
             mirror,
@@ -437,7 +436,7 @@ impl<'a, const D: usize, M: Mirror<D> + ?Sized> RayPath<'a, D, M> {
     }
 
     #[inline]
-    pub fn current_ray_dir(&self) -> Unit<SVector<Float, D>> {
+    pub const fn current_ray_dir(&self) -> Unit<SVector<Float, D>> {
         self.ctx.ray.direction
     }
 }

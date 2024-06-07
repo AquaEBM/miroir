@@ -3,10 +3,12 @@ use super::*;
 use gl::index::{NoIndices, PrimitiveType};
 const LINE_STRIP: NoIndices = NoIndices(PrimitiveType::LineStrip);
 
-pub(crate) struct SimRenderData<const D: usize> {
-    rays: Vec<gl::VertexBuffer<Vertex<D>>>,
+pub struct SimRenderData<const D: usize> {
+    ray_origins: gl::VertexBuffer<Vertex<D>>,
+    ray_paths: Vec<gl::VertexBuffer<Vertex<D>>>,
     mirrors: Vec<Box<dyn RenderData>>,
     program: gl::Program,
+    starting_pts_program: gl::Program,
 }
 
 const FRAGMENT_SHADER_SRC: &str = r#"
@@ -21,73 +23,46 @@ const FRAGMENT_SHADER_SRC: &str = r#"
     }
 "#;
 
-impl SimRenderData<3> {
-    pub(crate) fn from_simulation<
-        M: Mirror<3> + OpenGLRenderable + ?Sized,
-        R: IntoIterator<Item = Ray<3>>,
-    >(
-        mirror: &M,
-        rays: R,
-        reflection_limit: Option<usize>,
-        display: &gl::Display,
-    ) -> Self {
-        const VERTEX_SHADER_SRC_3D: &str = r#"
-            #version 140
+const STARTING_POINT_GEOMETRY_SHADER_SRC: &str = r#"
+    #version 330
 
-            in vec3 position;
-            uniform mat4 perspective;
-            uniform mat4 view;
+    layout (points) in;
+    layout (line_strip, max_vertices = 4) out;
 
-            void main() {
-                gl_Position = perspective * view * vec4(position, 1.0);
-            }
-        "#;
+    uniform mat4 perspective;
 
-        let program =
-            gl::Program::from_source(display, VERTEX_SHADER_SRC_3D, FRAGMENT_SHADER_SRC, None)
-                .unwrap();
+    void main() {
+        gl_Position = gl_in[0].gl_Position + perspective * vec4(0.5, 0.5, 0.0, 1.0);
+        EmitVertex();
 
-        let mut mirrors = vec![];
+        gl_Position = gl_in[0].gl_Position + perspective * vec4(-0.5, -0.5, 0.0, 1.0);
+        EmitVertex();
+        EndPrimitive();
 
-        mirror.append_render_data(display, List::from(&mut mirrors));
+        gl_Position = gl_in[0].gl_Position + perspective * vec4(-0.5, 0.5, 0.0, 1.0);
+        EmitVertex();
 
-        let mut vertex_scratch = vec![];
-
-        Self {
-            rays: rays
-                .into_iter()
-                .map(|ray| {
-                    vertex_scratch.clear();
-                    vertex_scratch.push(ray.origin.into());
-
-                    let path = RayPath::new(mirror, ray).map(Vertex::from);
-
-                    if let Some(n) = reflection_limit {
-                        vertex_scratch.extend(path.take(n))
-                    } else {
-                        vertex_scratch.extend(path)
-                    }
-
-                    gl::VertexBuffer::immutable(display, &vertex_scratch).unwrap()
-                })
-                .collect(),
-            mirrors,
-            program,
-        }
+        gl_Position = gl_in[0].gl_Position + perspective * vec4(0.5, -0.5, 0.0, 1.0);
+        EmitVertex();
+        EndPrimitive();
     }
-}
+"#;
 
-impl SimRenderData<2> {
+impl<const D: usize> SimRenderData<D>
+where
+    Vertex<D>: gl::Vertex,
+{
     pub(crate) fn from_simulation<
-        M: Mirror<2> + OpenGLRenderable + ?Sized,
-        R: IntoIterator<Item = Ray<2>>,
+        M: Mirror<D> + OpenGLRenderable + ?Sized,
+        R: IntoIterator<Item = Ray<D>>,
     >(
         mirror: &M,
         rays: R,
         reflection_limit: Option<usize>,
         display: &gl::Display,
     ) -> Self {
-        const VERTEX_SHADER_SRC_2D: &str = r#"
+        let vertex_shader = if D == 2 {
+            r#"
             #version 140
 
             in vec2 position;
@@ -97,46 +72,76 @@ impl SimRenderData<2> {
             void main() {
                 gl_Position = perspective * view * vec4(position, 0.0, 1.0);
             }
-        "#;
+        "#
+        } else if D == 3 {
+            r#"
+            #version 140
+
+            in vec3 position;
+            uniform mat4 perspective;
+            uniform mat4 view;
+
+            void main() {
+                gl_Position = perspective * view * vec4(position, 1.0);
+            }
+        "#
+        } else {
+            unreachable!()
+        };
 
         let program =
-            gl::Program::from_source(display, VERTEX_SHADER_SRC_2D, FRAGMENT_SHADER_SRC, None)
-                .unwrap();
+            gl::Program::from_source(display, vertex_shader, FRAGMENT_SHADER_SRC, None).unwrap();
+
+        let starting_pts_program = gl::Program::from_source(
+            display,
+            vertex_shader,
+            FRAGMENT_SHADER_SRC,
+            Some(STARTING_POINT_GEOMETRY_SHADER_SRC),
+        )
+        .unwrap();
 
         let mut mirrors = vec![];
 
         mirror.append_render_data(display, List::from(&mut mirrors));
 
+        mirrors.shrink_to_fit();
+
         let mut vertex_scratch = vec![];
+        let mut ray_origins = vec![];
+
+        let mut ray_paths: Vec<_> = rays
+            .into_iter()
+            .map(|ray| {
+                let origin = ray.origin.into();
+
+                ray_origins.push(origin);
+
+                vertex_scratch.clear();
+                vertex_scratch.push(origin);
+
+                let path = RayPath::new(mirror, ray).map(Vertex::from);
+
+                if let Some(n) = reflection_limit {
+                    vertex_scratch.extend(path.take(n))
+                } else {
+                    vertex_scratch.extend(path)
+                }
+
+                gl::VertexBuffer::immutable(display, &vertex_scratch).unwrap()
+            })
+            .collect();
+
+        ray_paths.shrink_to_fit();
 
         Self {
-            rays: rays
-                .into_iter()
-                .map(|ray| {
-                    vertex_scratch.clear();
-                    vertex_scratch.push(ray.origin.into());
-
-                    let path = RayPath::new(mirror, ray).map(Vertex::from);
-
-                    if let Some(n) = reflection_limit {
-                        vertex_scratch.extend(path.take(n))
-                    } else {
-                        vertex_scratch.extend(path)
-                    }
-
-                    gl::VertexBuffer::immutable(display, &vertex_scratch).unwrap()
-                })
-                .collect(),
+            ray_origins: gl::VertexBuffer::immutable(display, &ray_origins).unwrap(),
+            ray_paths,
             mirrors,
             program,
+            starting_pts_program,
         }
     }
-}
 
-impl<const D: usize> SimRenderData<D>
-where
-    Vertex<D>: gl::Vertex,
-{
     pub(crate) fn run(self, display: gl::Display, events_loop: glutin::event_loop::EventLoop<()>) {
         const DEFAULT_CAMERA_POS: cg::Point3<f32> = cg::Point3::new(0., 0., 5.);
         const DEFAULT_CAMERA_YAW: cg::Deg<f32> = cg::Deg(-90.);
@@ -255,10 +260,12 @@ where
 
     fn render_3d(&self, display: &gl::Display, camera: &Camera, projection: &Projection) {
         const RAY_NON_LOOP_COL: [f32; 4] = [0.7, 0.3, 0.1, 1.0];
-        let mirror_color = if D >= 3 {
+        let mirror_color = if D == 3 {
             [0.3f32, 0.3, 0.9, 0.4]
-        } else {
+        } else if D == 2 {
             [0.15, 0.15, 0.5, 1.0]
+        } else {
+            unreachable!();
         };
 
         let mut target = display.draw();
@@ -266,22 +273,17 @@ where
         use gl::Surface;
         target.clear_color_and_depth((1., 0.95, 0.7, 1.), 1.0);
 
-        let perspective = projection.get_matrix();
-        let view = camera.calc_matrix();
+        let perspective: [[f32 ; 4] ; 4] = projection.get_matrix().into();
+        let view: [[f32 ; 4] ; 4] = camera.calc_matrix().into();
 
         let params = gl::DrawParameters {
-            depth: gl::Depth {
-                test: gl::draw_parameters::DepthTest::Overwrite,
-                write: false,
-                ..Default::default()
-            },
+            depth: Default::default(),
             line_width: Some(1.0),
-            multisampling: true,
             blend: gl::Blend::alpha_blending(),
             ..Default::default()
         };
 
-        for ray in &self.rays {
+        for ray in &self.ray_paths {
             target
                 .draw(
                     ray,
@@ -312,6 +314,20 @@ where
                 )
                 .unwrap();
         }
+
+        target
+            .draw(
+                &self.ray_origins,
+                NoIndices(PrimitiveType::Points),
+                &self.starting_pts_program,
+                &gl::uniform! {
+                    perspective: perspective,
+                    view: view,
+                    color_vec: [1.0f32, 0.0, 0.0, 1.0],
+                },
+                &params,
+            )
+            .unwrap();
 
         target.finish().unwrap();
 

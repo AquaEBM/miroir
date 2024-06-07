@@ -14,7 +14,7 @@ impl<const D: usize> EuclideanSphereMirror<D> {
         (radius.abs() >= Float::EPSILON).then_some(Self { center, radius })
     }
 
-    pub fn radius(&self) -> &Float {
+    pub const fn radius(&self) -> &Float {
         &self.radius
     }
 
@@ -49,9 +49,9 @@ impl<const D: usize> Mirror<D> for EuclideanSphereMirror<D> {
 
         let a = d.norm_squared();
         let b = v.dot(d);
-        let c = s - r * r;
+        let c = r.mul_add(-r, s);
 
-        let delta = b * b - a * c;
+        let delta = c.mul_add(-a, b * b);
 
         if delta > Float::EPSILON {
             let root_delta = delta.sqrt();
@@ -100,7 +100,7 @@ impl<const D: usize> JsonDes for EuclideanSphereMirror<D> {
             .and_then(serde_json::Value::as_f64)
             .ok_or("Failed to parse radius")? as Float;
 
-        Self::new(center, radius).ok_or("radius must not be too close to 0.0".into())
+        Self::new(center, radius).ok_or_else(|| "radius must not be too close to 0.0".into())
     }
 }
 

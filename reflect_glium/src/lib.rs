@@ -12,10 +12,10 @@ use nalgebra as na;
 use reflect::*;
 
 mod camera;
-mod sim_render_data;
+mod app;
 
 use camera::{Camera, CameraController, Projection};
-use sim_render_data::SimRenderData;
+use app::App;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Vertex<const N: usize> {
@@ -68,10 +68,9 @@ pub fn run_simulation<
     )
     .expect("failed to build display");
 
-    let drawable_simulation =
-        SimRenderData::from_simulation(mirror, rays, reflection_limit, &display);
+    let app = App::from_simulation(mirror, rays, reflection_limit, &display);
 
-    drawable_simulation.run(display, el);
+    app.run(display, el);
 }
 
 /// A trait encompassing a shape that can be rendered

@@ -3,7 +3,7 @@ use super::*;
 use gl::index::{NoIndices, PrimitiveType};
 const LINE_STRIP: NoIndices = NoIndices(PrimitiveType::LineStrip);
 
-pub struct SimRenderData<const D: usize> {
+pub struct App<const D: usize> {
     ray_origins: gl::VertexBuffer<Vertex<D>>,
     ray_paths: Vec<gl::VertexBuffer<Vertex<D>>>,
     mirrors: Vec<Box<dyn RenderData>>,
@@ -65,7 +65,7 @@ const STARTING_POINT_GEOMETRY_SHADER_SRC: &str = r#"
     }
 "#;
 
-impl<const D: usize> SimRenderData<D>
+impl<const D: usize> App<D>
 where
     Vertex<D>: gl::Vertex,
 {

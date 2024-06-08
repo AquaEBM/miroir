@@ -1,4 +1,4 @@
-use reflect::{self, Ray};
+use reflect::Ray;
 use reflect_mirrors::CylindricalMirror;
 
 fn main() {

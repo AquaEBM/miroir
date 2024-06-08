@@ -11,11 +11,11 @@ use gl::glutin;
 use nalgebra as na;
 use reflect::*;
 
-mod camera;
 mod app;
+mod camera;
 
-use camera::{Camera, CameraController, Projection};
 use app::App;
+use camera::{Camera, CameraController, Projection};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Vertex<const N: usize> {
@@ -102,11 +102,6 @@ pub struct List<T>(Vec<T>);
 
 impl<T> List<T> {
     #[inline]
-    pub const fn new(list: Vec<T>) -> Self {
-        Self(list)
-    }
-
-    #[inline]
     pub fn into_inner(self) -> Vec<T> {
         self.0
     }
@@ -162,7 +157,7 @@ impl<T> Extend<T> for List<T> {
     }
 }
 
-impl<'a, T> From<Vec<T>> for List<T> {
+impl<T> From<Vec<T>> for List<T> {
     #[inline]
     fn from(value: Vec<T>) -> Self {
         Self(value)
@@ -187,8 +182,8 @@ impl<const N: usize, T: OpenGLRenderable> OpenGLRenderable for [T; N] {
     }
 }
 
-// It's clear that all these impls use the `Deref` trait, but writing a blanket impl over all types implementing `Deref`
-// makes the trait unusable downstream
+// It's clear that all these impls use the `Deref` trait, but writing a blanket impl over all
+// types implementing `Deref` makes the trait unusable downstream
 
 impl<T: OpenGLRenderable + ?Sized> OpenGLRenderable for Box<T> {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {

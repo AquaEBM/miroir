@@ -1,4 +1,4 @@
-use reflect;
+use reflect::Ray;
 use reflect_mirrors::{EuclideanSphereMirror, PlaneMirror};
 
 fn main() {
@@ -8,7 +8,7 @@ fn main() {
         .unwrap_or(300);
 
     let mirrors = (
-        EuclideanSphereMirror::new([0.0, 0.0, 0.0], 4.0),
+        EuclideanSphereMirror::new([0., 0., 0.], 4.),
         [
             PlaneMirror::new([[5., 0., 0.], [0., 5., 0.], [0., 0., 5.]]),
             PlaneMirror::new([[-5., 0., 0.], [0., 5., 0.], [0., 0., 5.]]),
@@ -18,6 +18,7 @@ fn main() {
             PlaneMirror::new([[0., 0., -5.], [0., 5., 0.], [5., 0., 0.]]),
         ],
     );
-    let rays = [reflect::Ray::new([4., 3., 0.1], [-1., -1., 0.])];
+
+    let rays = [Ray::new([4., 3., 0.1], [-1., -1., 0.])];
     reflect_glium::run_simulation(&mirrors, rays, Some(reflection_cap));
 }

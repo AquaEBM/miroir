@@ -66,7 +66,7 @@ impl Projection {
         }
     }
 
-    pub fn aspect(&self) -> f32 {
+    pub const fn aspect(&self) -> f32 {
         self.aspect
     }
 

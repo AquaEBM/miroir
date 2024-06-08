@@ -24,18 +24,22 @@ impl<const D: usize> SimulationCtx<D> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn ray(&self) -> &Ray<D> {
         &self.ray
     }
 
+    /// # Panics
+    /// 
+    /// if `tangent` is parallel to `self.ray()`.
     pub fn add_tangent(&mut self, tangent: Plane<D>) {
+        const E: Float = Float::EPSILON * 64.0;
+
         let d = tangent
             .try_ray_intersection(self.ray())
             .expect("a mirror returned a plane parallel to the ray: aborting");
 
-        const E: Float = Float::EPSILON * 64.0;
-
-        if d >= E && self.closest.as_ref().map(|(t, _)| *t > d).unwrap_or(true) {
+        if d >= E && self.closest.as_ref().map_or(true, |(t, _)| *t > d) {
             self.closest = Some((d, tangent.direction));
         }
     }
@@ -84,6 +88,7 @@ impl<const D: usize> Ray<D> {
 
     /// Get the point at distance `t` (can be negative) from the ray's origin
     #[inline]
+    #[must_use]
     pub fn at(&self, t: Float) -> SVector<Float, D> {
         self.origin + self.dir.as_ref() * t
     }
@@ -105,6 +110,7 @@ impl<const D: usize> HyperPlaneBasis<D> {
     ///
     /// Note that an expression like `[T ; D - 1]` is locked under `#[feature(const_generic_exprs)]`.
     #[inline]
+    #[must_use]
     pub fn new(vectors: [SVector<Float, D>; D]) -> Option<(Self, HyperPlaneBasisOrtho<D>)> {
         let mut orthonormalized = vectors;
         (SVector::orthonormalize(&mut orthonormalized[1..]) == D - 1).then_some((
@@ -117,6 +123,7 @@ impl<const D: usize> HyperPlaneBasis<D> {
 
     /// A reference to the unused first vector in the array.
     #[inline]
+    #[must_use]
     pub const fn v0(&self) -> &SVector<Float, D> {
         &self.vectors[0]
     }
@@ -131,11 +138,13 @@ impl<const D: usize> HyperPlaneBasis<D> {
     ///
     /// The returned slice is garanteed to be of length `D - 1`.
     #[inline]
+    #[must_use]
     pub fn basis(&self) -> &[SVector<Float, D>] {
         &self.vectors[1..]
     }
 
     #[inline]
+    #[must_use]
     pub const fn vectors_raw(&self) -> &[SVector<Float, D>; D] {
         &self.vectors
     }
@@ -152,6 +161,7 @@ impl<const D: usize> HyperPlaneBasis<D> {
     ///
     /// `interserction = plane.origin + sum for k in [2 ; n] t_k * v_k`
     #[inline]
+    #[must_use]
     pub fn intersection_coordinates(
         &self,
         ray: &Ray<D>,
@@ -182,6 +192,7 @@ pub struct HyperPlaneBasisOrtho<const D: usize> {
 impl<const D: usize> HyperPlaneBasisOrtho<D> {
     /// A reference to the unused first vector in the array.
     #[inline]
+    #[must_use]
     pub const fn v0(&self) -> &SVector<Float, D> {
         &self.vectors[0]
     }
@@ -196,18 +207,21 @@ impl<const D: usize> HyperPlaneBasisOrtho<D> {
     ///
     /// The returned slice is garanteed to be of length `D - 1`.
     #[inline]
+    #[must_use]
     pub fn basis(&self) -> &[SVector<Float, D>] {
         &self.vectors[1..]
     }
 
     /// Returns the orthogonal projection of `v` w.r.t. `self`
     #[inline]
+    #[must_use]
     pub fn project(&self, v: SVector<Float, D>) -> SVector<Float, D> {
         self.basis().iter().map(|e| v.dot(e) * e).sum()
     }
 
     /// Returns the point in this plane whose distance with `p` is smallest.
     #[inline]
+    #[must_use]
     pub fn closest_point_to_plane(
         &self,
         v0: &SVector<Float, D>,
@@ -229,6 +243,7 @@ impl<const D: usize> HyperPlaneBasisOrtho<D> {
     ///
     /// `interserction = v0 + sum for k in [2 ; n] t_k * v_k`
     #[inline]
+    #[must_use]
     pub fn intersection_coordinates(
         &self,
         ray: &Ray<D>,
@@ -258,6 +273,7 @@ pub enum HyperPlane<const D: usize> {
 impl<const D: usize> HyperPlane<D> {
     /// Reflect a vector w.r.t this hyperplane
     #[inline]
+    #[must_use]
     pub fn reflect(&self, v: SVector<Float, D>) -> SVector<Float, D> {
         match self {
             Self::Plane(plane) => 2.0 * plane.project(v) - v,
@@ -270,6 +286,7 @@ impl<const D: usize> HyperPlane<D> {
 
     /// Reflect a unit vector w.r.t. this hyperplane
     #[inline]
+    #[must_use]
     pub fn reflect_unit(&self, v: Unit<SVector<Float, D>>) -> Unit<SVector<Float, D>> {
         // SAFETY: orthogonal symmetry preserves euclidean norms
         // This function is supposed to be unsafe, why nalgebra? why?
@@ -281,6 +298,7 @@ impl<const D: usize> HyperPlane<D> {
     ///
     /// Returns `None` if `ray` is parallel to `self`
     #[inline]
+    #[must_use]
     pub fn try_ray_intersection(&self, v0: &SVector<Float, D>, ray: &Ray<D>) -> Option<Float> {
         match self {
             Self::Plane(plane) => plane.intersection_coordinates(ray, v0).map(|v| v[0]),
@@ -317,6 +335,7 @@ impl<const D: usize> Plane<D> {
     ///
     /// Returns `None` if `ray` is parallel to `self`
     #[inline]
+    #[must_use]
     pub fn try_ray_intersection(&self, ray: &Ray<D>) -> Option<Float> {
         match &self.intersection {
             Intersection::Distance(t) => Some(*t),
@@ -370,14 +389,14 @@ pub trait Mirror<const D: usize> {
 impl<const D: usize, T: Mirror<D>> Mirror<D> for [T] {
     #[inline]
     fn add_tangents(&self, ctx: &mut SimulationCtx<D>) {
-        self.iter().for_each(|mirror| mirror.add_tangents(ctx))
+        self.iter().for_each(|mirror| mirror.add_tangents(ctx));
     }
 }
 
 impl<const N: usize, const D: usize, T: Mirror<D>> Mirror<D> for [T; N] {
     #[inline]
     fn add_tangents(&self, ctx: &mut SimulationCtx<D>) {
-        self.as_slice().add_tangents(ctx)
+        self.as_slice().add_tangents(ctx);
     }
 }
 
@@ -387,42 +406,42 @@ impl<const N: usize, const D: usize, T: Mirror<D>> Mirror<D> for [T; N] {
 impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Box<T> {
     #[inline]
     fn add_tangents(&self, ctx: &mut SimulationCtx<D>) {
-        self.deref().add_tangents(ctx)
+        self.deref().add_tangents(ctx);
     }
 }
 
 impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Arc<T> {
     #[inline]
     fn add_tangents(&self, ctx: &mut SimulationCtx<D>) {
-        self.deref().add_tangents(ctx)
+        self.deref().add_tangents(ctx);
     }
 }
 
 impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Rc<T> {
     #[inline]
     fn add_tangents(&self, ctx: &mut SimulationCtx<D>) {
-        self.deref().add_tangents(ctx)
+        self.deref().add_tangents(ctx);
     }
 }
 
 impl<const D: usize, T: Mirror<D>> Mirror<D> for Vec<T> {
     #[inline]
     fn add_tangents(&self, ctx: &mut SimulationCtx<D>) {
-        self.as_slice().add_tangents(ctx)
+        self.as_slice().add_tangents(ctx);
     }
 }
 
 impl<'a, const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for &'a T {
     #[inline]
     fn add_tangents(&self, ctx: &mut SimulationCtx<D>) {
-        (*self).add_tangents(ctx)
+        (*self).add_tangents(ctx);
     }
 }
 
 impl<'a, const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for &'a mut T {
     #[inline]
     fn add_tangents(&self, ctx: &mut SimulationCtx<D>) {
-        self.deref().add_tangents(ctx)
+        self.deref().add_tangents(ctx);
     }
 }
 
@@ -441,6 +460,7 @@ impl<'a, const D: usize, M: Mirror<D> + ?Sized> RayPath<'a, D, M> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn current_ray(&self) -> &Ray<D> {
         self.ctx.ray()
     }
@@ -458,6 +478,7 @@ impl<'a, const D: usize, M: Mirror<D> + ?Sized> Iterator for RayPath<'a, D, M> {
 }
 
 #[inline]
+#[must_use]
 pub fn loop_index<const D: usize>(
     path: &[SVector<Float, D>],
     pt: SVector<Float, D>,

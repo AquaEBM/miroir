@@ -42,7 +42,17 @@ impl<const D: usize> From<na::SVector<f64, D>> for Vertex<D> {
     }
 }
 
-fn default_display_event_loop() -> (glutin::event_loop::EventLoop<()>, gl::Display) {
+pub fn run_simulation<
+    const D: usize,
+    M: Mirror<D> + OpenGLRenderable + ?Sized,
+    R: IntoIterator<Item = Ray<D>>,
+>(
+    mirror: &M,
+    rays: R,
+    reflection_limit: Option<usize>,
+) where
+    Vertex<D>: gl::Vertex,
+{
     const DEFAULT_WIDTH: u32 = 1280;
     const DEFAULT_HEIGHT: u32 = 720;
 
@@ -57,22 +67,6 @@ fn default_display_event_loop() -> (glutin::event_loop::EventLoop<()>, gl::Displ
         &el,
     )
     .expect("failed to build display");
-
-    (el, display)
-}
-
-pub fn run_simulation<
-    const D: usize,
-    M: Mirror<D> + OpenGLRenderable + ?Sized,
-    R: IntoIterator<Item = Ray<D>>,
->(
-    mirror: &M,
-    rays: R,
-    reflection_limit: Option<usize>,
-) where
-    Vertex<D>: gl::Vertex,
-{
-    let (el, display) = default_display_event_loop();
 
     let drawable_simulation =
         SimRenderData::from_simulation(mirror, rays, reflection_limit, &display);

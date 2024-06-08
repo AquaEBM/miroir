@@ -9,6 +9,7 @@ glium = "0.32"
 glium_shapes = { git = "https://github.com/FlashOnFire/glium_shapes.git", branch = "glium-0.32.2" }
 reflect = { path = "../reflect" }
 cgmath = "0.18"
+impl-trait-for-tuples = "0.2"
 
 [dev-dependencies]
 

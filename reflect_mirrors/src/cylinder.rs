@@ -11,10 +11,16 @@ pub struct CylindricalMirror {
 
 impl CylindricalMirror {
     /// Create a new cylinder from a line segment and a radius
-    pub fn new(line_segment: [SVector<Float, 3>; 2], radius: Float) -> Option<Self> {
+    #[inline]
+    pub fn try_new(
+        segment_start: impl Into<SVector<Float, 3>>,
+        segment_end: impl Into<SVector<Float, 3>>,
+        radius: Float,
+    ) -> Option<Self> {
         const E: Float = Float::EPSILON * 8.0;
 
-        let [start, end] = line_segment;
+        let start = segment_start.into();
+        let end = segment_end.into();
         let dist = end - start;
         let dist_sq = dist.norm_squared();
 
@@ -28,18 +34,31 @@ impl CylindricalMirror {
         })
     }
 
+    #[inline]
+    pub fn new(
+        segment_start: impl Into<SVector<Float, 3>>,
+        segment_end: impl Into<SVector<Float, 3>>,
+        radius: Float,
+    ) -> Self {
+        Self::try_new(segment_start, segment_end, radius).unwrap()
+    }
+
+    #[inline]
     pub const fn segment_dist(&self) -> SVector<Float, 3> {
         self.dist
     }
 
+    #[inline]
     pub fn line_segment(&self) -> [SVector<Float, 3>; 2] {
         [self.start, self.start + self.dist]
     }
 
+    #[inline]
     pub const fn radius(&self) -> Float {
         self.radius
     }
 
+    #[inline]
     pub fn set_radius(&mut self, radius: Float) -> bool {
         let r_abs = radius.abs();
         let ok = r_abs > Float::EPSILON * 16.0;
@@ -60,7 +79,7 @@ impl Mirror<3> for CylindricalMirror {
         let ray = *ctx.ray();
 
         let m = ray.origin - self.start;
-        let d = ray.direction.into_inner();
+        let d = ray.dir.into_inner();
         let pm = p(m);
         let pd = p(d);
 
@@ -118,14 +137,14 @@ impl JsonDes for CylindricalMirror {
             .get("start")
             .and_then(serde_json::Value::as_array)
             .map(Vec::as_slice)
-            .and_then(json_array_to_vector)
+            .and_then(json_array_to_float_array)
             .ok_or("Failed to parse start")?;
 
         let end = json
             .get("end")
             .and_then(serde_json::Value::as_array)
             .map(Vec::as_slice)
-            .and_then(json_array_to_vector)
+            .and_then(json_array_to_float_array)
             .ok_or("Failed to parse end")?;
 
         let radius = json
@@ -133,7 +152,7 @@ impl JsonDes for CylindricalMirror {
             .and_then(serde_json::Value::as_f64)
             .ok_or("Failed to parse radius")? as Float;
 
-        Self::new([start, end], radius)
+        Self::try_new(start, end, radius)
             .ok_or_else(|| "radius is too small or start and end vectors are too close".into())
     }
 }
@@ -171,7 +190,7 @@ impl RenderData for CylinderRenderData {
 }
 
 impl OpenGLRenderable for CylindricalMirror {
-    fn append_render_data(&self, display: &gl::Display, mut list: List<Box<dyn RenderData>>) {
+    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         const NUM_POINTS: usize = 360;
 
         let d = self.segment_dist().map(|s| s as f32);

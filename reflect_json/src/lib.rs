@@ -114,7 +114,7 @@ impl<const D: usize> JsonSer for Ray<D> {
     fn to_json(&self) -> serde_json::Value {
         serde_json::json!({
             "origin": self.origin.as_slice(),
-            "direction": self.direction.as_ref().as_slice(),
+            "direction": self.dir.as_ref().as_slice(),
         })
     }
 }
@@ -157,7 +157,10 @@ impl<const D: usize> JsonDes for Ray<D> {
         let direction =
             Unit::try_new(direction, Float::EPSILON).ok_or("Unable to normalize ray direction")?;
 
-        Ok(Self { origin, direction })
+        Ok(Self {
+            origin,
+            dir: direction,
+        })
     }
 }
 

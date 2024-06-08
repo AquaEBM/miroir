@@ -11,8 +11,13 @@ pub struct PlaneMirror<const D: usize> {
 
 impl<const D: usize> PlaneMirror<D> {
     #[inline]
-    pub fn try_new(vectors: [SVector<Float, D>; D]) -> Option<Self> {
+    pub fn try_new(vectors: [impl Into<SVector<Float, D>>; D]) -> Option<Self> {
         vectors.try_into().ok()
+    }
+
+    #[inline]
+    pub fn new(vectors: [impl Into<SVector<Float, D>>; D]) -> Self {
+        Self::try_new(vectors).unwrap()
     }
 
     #[inline]
@@ -21,12 +26,12 @@ impl<const D: usize> PlaneMirror<D> {
     }
 }
 
-impl<const D: usize> TryFrom<[SVector<Float, D>; D]> for PlaneMirror<D> {
+impl<const D: usize, U: Into<SVector<Float, D>>> TryFrom<[U; D]> for PlaneMirror<D> {
     type Error = ();
 
     #[inline]
-    fn try_from(vectors: [SVector<Float, D>; D]) -> Result<Self, Self::Error> {
-        HyperPlaneBasis::new(vectors)
+    fn try_from(vectors: [U; D]) -> Result<Self, Self::Error> {
+        HyperPlaneBasis::new(vectors.map(|v| v.into()))
             .map(|(plane, orthonormalised)| Self {
                 plane,
                 orthonormalised,
@@ -165,7 +170,7 @@ impl<const D: usize> RenderData for PlaneRenderData<D> {
 }
 
 impl OpenGLRenderable for PlaneMirror<2> {
-    fn append_render_data(&self, display: &gl::Display, mut list: List<Box<dyn RenderData>>) {
+    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         let vertices: Vec<_> = self.vertices().map(Vertex2D::from).collect();
 
         list.push(Box::new(PlaneRenderData {
@@ -175,7 +180,7 @@ impl OpenGLRenderable for PlaneMirror<2> {
 }
 
 impl OpenGLRenderable for PlaneMirror<3> {
-    fn append_render_data(&self, display: &gl::Display, mut list: List<Box<dyn RenderData>>) {
+    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         let vertices: Vec<_> = self.vertices().map(Vertex3D::from).collect();
 
         list.push(Box::new(PlaneRenderData {

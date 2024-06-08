@@ -36,11 +36,7 @@ fn deserialize_boxed<const D: usize>(
         .ok_or(f!("invalid_mirror_type: {mirror_type}"))?;
 
     if mirror_type.starts_with("[]") {
-        reflect_json::map_json_array::<Vec<_>, _>(
-            mirror_json,
-            deserializer,
-        )
-        .map(boxed)
+        reflect_json::map_json_array::<Vec<_>, _>(mirror_json, deserializer).map(boxed)
     } else {
         deserializer(mirror_json)
     }

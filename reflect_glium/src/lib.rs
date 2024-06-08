@@ -61,12 +61,15 @@ fn default_display_event_loop() -> (glutin::event_loop::EventLoop<()>, gl::Displ
     (el, display)
 }
 
-pub fn run_simulation<const D: usize, M: Mirror<D> + OpenGLRenderable + ?Sized, R: IntoIterator<Item = Ray<D>>>(
+pub fn run_simulation<
+    const D: usize,
+    M: Mirror<D> + OpenGLRenderable + ?Sized,
+    R: IntoIterator<Item = Ray<D>>,
+>(
     mirror: &M,
     rays: R,
     reflection_limit: Option<usize>,
-)
-where
+) where
     Vertex<D>: gl::Vertex,
 {
     let (el, display) = default_display_event_loop();
@@ -101,18 +104,18 @@ where
     }
 }
 
-/// A wrapper around a `&mut Vec<T>` that only allows pushing/appending/extending etc...
-pub struct List<'a, T>(&'a mut Vec<T>);
+/// A wrapper around a `Vec<T>` that only allows pushing/appending/extending etc...
+pub struct List<T>(Vec<T>);
 
-impl<'a, T> List<'a, T> {
+impl<T> List<T> {
     #[inline]
-    pub fn reborrow(&mut self) -> List<T> {
-        List(self.0)
+    pub const fn new(list: Vec<T>) -> Self {
+        Self(list)
     }
 
     #[inline]
-    pub fn new(list: &'a mut Vec<T>) -> Self {
-        Self(list)
+    pub fn into_inner(self) -> Vec<T> {
+        self.0
     }
 
     #[inline]
@@ -159,33 +162,34 @@ impl<'a, T> List<'a, T> {
     }
 }
 
-impl<'a, T> Extend<T> for List<'a, T> {
+impl<T> Extend<T> for List<T> {
     #[inline]
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         self.0.extend(iter)
     }
 }
 
-impl<'a, T> From<&'a mut Vec<T>> for List<'a, T> {
+impl<'a, T> From<Vec<T>> for List<T> {
     #[inline]
-    fn from(value: &'a mut Vec<T>) -> Self {
+    fn from(value: Vec<T>) -> Self {
         Self(value)
     }
 }
 
+#[impl_trait_for_tuples::impl_for_tuples(32)]
 pub trait OpenGLRenderable {
-    fn append_render_data(&self, display: &gl::Display, list: List<Box<dyn RenderData>>);
+    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>);
 }
 
 impl<T: OpenGLRenderable> OpenGLRenderable for [T] {
-    fn append_render_data(&self, display: &gl::Display, mut list: List<Box<dyn RenderData>>) {
+    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         self.iter()
-            .for_each(|a| a.append_render_data(display, list.reborrow()))
+            .for_each(|a| a.append_render_data(display, list))
     }
 }
 
 impl<const N: usize, T: OpenGLRenderable> OpenGLRenderable for [T; N] {
-    fn append_render_data(&self, display: &gl::Display, list: List<Box<dyn RenderData>>) {
+    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         self.as_slice().append_render_data(display, list)
     }
 }
@@ -194,37 +198,37 @@ impl<const N: usize, T: OpenGLRenderable> OpenGLRenderable for [T; N] {
 // makes the trait unusable downstream
 
 impl<T: OpenGLRenderable + ?Sized> OpenGLRenderable for Box<T> {
-    fn append_render_data(&self, display: &gl::Display, list: List<Box<dyn RenderData>>) {
+    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         self.deref().append_render_data(display, list)
     }
 }
 
 impl<T: OpenGLRenderable + ?Sized> OpenGLRenderable for Arc<T> {
-    fn append_render_data(&self, display: &gl::Display, list: List<Box<dyn RenderData>>) {
+    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         self.deref().append_render_data(display, list)
     }
 }
 
 impl<T: OpenGLRenderable + ?Sized> OpenGLRenderable for Rc<T> {
-    fn append_render_data(&self, display: &gl::Display, list: List<Box<dyn RenderData>>) {
+    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         self.deref().append_render_data(display, list)
     }
 }
 
 impl<T: OpenGLRenderable> OpenGLRenderable for Vec<T> {
-    fn append_render_data(&self, display: &gl::Display, list: List<Box<dyn RenderData>>) {
+    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         self.deref().append_render_data(display, list)
     }
 }
 
 impl<'a, T: OpenGLRenderable + ?Sized> OpenGLRenderable for &'a T {
-    fn append_render_data(&self, display: &gl::Display, list: List<Box<dyn RenderData>>) {
+    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         (*self).append_render_data(display, list)
     }
 }
 
 impl<'a, T: OpenGLRenderable + ?Sized> OpenGLRenderable for &'a mut T {
-    fn append_render_data(&self, display: &gl::Display, list: List<Box<dyn RenderData>>) {
+    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         self.deref().append_render_data(display, list)
     }
 }

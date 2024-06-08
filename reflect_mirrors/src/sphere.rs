@@ -10,14 +10,26 @@ pub struct EuclideanSphereMirror<const D: usize> {
 }
 
 impl<const D: usize> EuclideanSphereMirror<D> {
-    pub fn new(center: SVector<Float, D>, radius: Float) -> Option<Self> {
-        (radius.abs() >= Float::EPSILON).then_some(Self { center, radius })
+    #[inline]
+    pub fn try_new(center: impl Into<SVector<Float, D>>, radius: impl Into<Float>) -> Option<Self> {
+        let radius = radius.into();
+        (radius.abs() >= Float::EPSILON).then(|| Self {
+            center: center.into(),
+            radius,
+        })
     }
 
+    #[inline]
+    pub fn new(center: impl Into<SVector<Float, D>>, radius: impl Into<Float>) -> Self {
+        Self::try_new(center, radius).unwrap()
+    }
+
+    #[inline]
     pub const fn radius(&self) -> &Float {
         &self.radius
     }
 
+    #[inline]
     pub fn set_radius(&mut self, r: Float) -> bool {
         let ok = r.abs() >= Float::EPSILON;
 
@@ -39,7 +51,7 @@ impl<const D: usize> Mirror<D> for EuclideanSphereMirror<D> {
 
         let ray = *ctx.ray();
 
-        let d = &ray.direction;
+        let d = &ray.dir;
 
         let v0 = &self.center;
         let v = ray.origin - v0;
@@ -100,7 +112,7 @@ impl<const D: usize> JsonDes for EuclideanSphereMirror<D> {
             .and_then(serde_json::Value::as_f64)
             .ok_or("Failed to parse radius")? as Float;
 
-        Self::new(center, radius).ok_or_else(|| "radius must not be too close to 0.0".into())
+        Self::try_new(center, radius).ok_or_else(|| "radius must not be too close to 0.0".into())
     }
 }
 
@@ -118,7 +130,7 @@ impl<const D: usize> JsonSer for EuclideanSphereMirror<D> {
 
 // Use glium_shapes::sphere::Sphere for the 3D implementation
 impl OpenGLRenderable for EuclideanSphereMirror<3> {
-    fn append_render_data(&self, display: &gl::Display, mut list: List<Box<dyn RenderData>>) {
+    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         let r = *self.radius() as f32;
         let [x, y, z] = self.center.map(|s| s as f32).into();
 
@@ -137,7 +149,7 @@ impl OpenGLRenderable for EuclideanSphereMirror<3> {
 
 // in 2d, the list of vertices of a circle is easy to calculate
 impl OpenGLRenderable for EuclideanSphereMirror<2> {
-    fn append_render_data(&self, display: &gl::Display, mut list: List<Box<dyn RenderData>>) {
+    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         list.push(Box::new(Circle::new(
             self.center.map(|s| s as f32).into(),
             *self.radius() as f32,

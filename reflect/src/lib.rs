@@ -59,26 +59,33 @@ pub struct Ray<const D: usize> {
     /// The starting point of the half-line
     pub origin: SVector<Float, D>,
     /// the direction of the half-line
-    pub direction: Unit<SVector<Float, D>>,
+    pub dir: Unit<SVector<Float, D>>,
 }
 
 impl<const D: usize> Ray<D> {
+    pub fn new(origin: impl Into<SVector<Float, D>>, dir: impl Into<SVector<Float, D>>) -> Self {
+        Self {
+            origin: origin.into(),
+            dir: Unit::new_normalize(dir.into()),
+        }
+    }
+
     /// Reflect the ray's direction with respect to the given hyperplane
     #[inline]
     pub fn reflect_dir(&mut self, dir_space: &HyperPlane<D>) {
-        self.direction = dir_space.reflect_unit(self.direction);
+        self.dir = dir_space.reflect_unit(self.dir);
     }
 
     /// Move the ray's position forward (or backward if t < 0.0) by `t`
     #[inline]
     pub fn advance(&mut self, t: Float) {
-        self.origin += t * self.direction.as_ref();
+        self.origin += t * self.dir.as_ref();
     }
 
     /// Get the point at distance `t` (can be negative) from the ray's origin
     #[inline]
     pub fn at(&self, t: Float) -> SVector<Float, D> {
-        self.origin + self.direction.as_ref() * t
+        self.origin + self.dir.as_ref() * t
     }
 }
 
@@ -151,7 +158,7 @@ impl<const D: usize> HyperPlaneBasis<D> {
         v0: &SVector<Float, D>,
     ) -> Option<SVector<Float, D>> {
         let mut a = SMatrix::<Float, D, D>::from_columns(&self.vectors);
-        a.set_column(0, ray.direction.as_ref());
+        a.set_column(0, ray.dir.as_ref());
 
         a.try_inverse_mut()
             // a now contains a^-1
@@ -228,7 +235,7 @@ impl<const D: usize> HyperPlaneBasisOrtho<D> {
         v0: &SVector<Float, D>,
     ) -> Option<SVector<Float, D>> {
         let mut a = SMatrix::<Float, D, D>::from_columns(&self.vectors);
-        a.set_column(0, ray.direction.as_ref());
+        a.set_column(0, ray.dir.as_ref());
 
         a.try_inverse_mut()
             // a now contains a^-1
@@ -274,15 +281,11 @@ impl<const D: usize> HyperPlane<D> {
     ///
     /// Returns `None` if `ray` is parallel to `self`
     #[inline]
-    pub fn try_ray_intersection(
-        &self,
-        v0: &SVector<Float, D>,
-        ray: &Ray<D>,
-    ) -> Option<Float> {
+    pub fn try_ray_intersection(&self, v0: &SVector<Float, D>, ray: &Ray<D>) -> Option<Float> {
         match self {
             Self::Plane(plane) => plane.intersection_coordinates(ray, v0).map(|v| v[0]),
             Self::Normal(normal) => {
-                let u = ray.direction.dot(normal);
+                let u = ray.dir.dot(normal);
                 (u.abs() > Float::EPSILON).then(|| (v0 - ray.origin).dot(normal) / u)
             }
         }
@@ -338,6 +341,7 @@ impl<const D: usize> Plane<D> {
 ///
 /// `D` could have been an associated constant, but, lack of
 /// `#[feature(generic_const_exprs)]` makes this difficult
+#[impl_trait_for_tuples::impl_for_tuples(32)]
 pub trait Mirror<const D: usize> {
     /// Adds the tangents to this mirror, at the
     /// points of intersection between it and the `ray`, in no particular order.
@@ -447,7 +451,9 @@ impl<'a, const D: usize, M: Mirror<D> + ?Sized> Iterator for RayPath<'a, D, M> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.ctx.update_ray(self.mirror).then(|| self.ctx.ray().origin)
+        self.ctx
+            .update_ray(self.mirror)
+            .then(|| self.ctx.ray().origin)
     }
 }
 

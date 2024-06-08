@@ -29,20 +29,37 @@ const STARTING_POINT_GEOMETRY_SHADER_SRC: &str = r#"
     layout (points) in;
     layout (line_strip, max_vertices = 4) out;
 
-    uniform mat4 perspective;
+    mat4 translate(vec2 delta) {
+        return(mat4(
+            vec4(1.0, 0.0, 0.0, 0.0),
+            vec4(0.0, 1.0, 0.0, 0.0),
+            vec4(0.0, 0.0, 1.0, 0.0),
+            vec4(delta, 0.0, 1.0)
+        ));
+    }
+
+    uniform float aspect;
 
     void main() {
-        gl_Position = gl_in[0].gl_Position + perspective * vec4(0.5, 0.5, 0.0, 1.0);
+        vec4 pos = gl_in[0].gl_Position;
+
+        float v = 0.025;
+
+        vec2 t1 = vec2(v, v * aspect);
+
+        gl_Position = translate(t1) * pos;
         EmitVertex();
 
-        gl_Position = gl_in[0].gl_Position + perspective * vec4(-0.5, -0.5, 0.0, 1.0);
+        gl_Position = translate(-t1) * pos;
         EmitVertex();
         EndPrimitive();
 
-        gl_Position = gl_in[0].gl_Position + perspective * vec4(-0.5, 0.5, 0.0, 1.0);
+        vec2 t2 = vec2(v, -v * aspect);
+
+        gl_Position = translate(t2) * pos;
         EmitVertex();
 
-        gl_Position = gl_in[0].gl_Position + perspective * vec4(0.5, -0.5, 0.0, 1.0);
+        gl_Position = translate(-t2) * pos;
         EmitVertex();
         EndPrimitive();
     }
@@ -100,9 +117,11 @@ where
         )
         .unwrap();
 
-        let mut mirrors = vec![];
+        let mut mirrors = List::from(vec![]);
 
-        mirror.append_render_data(display, List::from(&mut mirrors));
+        mirror.append_render_data(display, &mut mirrors);
+
+        let mut mirrors = mirrors.into_inner();
 
         mirrors.shrink_to_fit();
 
@@ -259,11 +278,11 @@ where
     }
 
     fn render_3d(&self, display: &gl::Display, camera: &Camera, projection: &Projection) {
-        const RAY_NON_LOOP_COL: [f32; 4] = [0.7, 0.3, 0.1, 1.0];
+        const RAY_NON_LOOP_COL: [f32; 4] = [0.7, 0.7, 0.7, 0.9];
         let mirror_color = if D == 3 {
-            [0.3f32, 0.3, 0.9, 0.4]
+            [0.05f32, 0.2, 0.2, 0.4]
         } else if D == 2 {
-            [0.15, 0.15, 0.5, 1.0]
+            [0.15, 0.5, 0.5, 1.0]
         } else {
             unreachable!();
         };
@@ -271,14 +290,14 @@ where
         let mut target = display.draw();
 
         use gl::Surface;
-        target.clear_color_and_depth((1., 0.95, 0.7, 1.), 1.0);
+        target.clear_color_and_depth((0.01, 0.01, 0.05, 1.), 1.0);
 
-        let perspective: [[f32 ; 4] ; 4] = projection.get_matrix().into();
-        let view: [[f32 ; 4] ; 4] = camera.calc_matrix().into();
+        let perspective: [[f32; 4]; 4] = projection.get_matrix().into();
+        let view: [[f32; 4]; 4] = camera.calc_matrix().into();
+
+        let aspect = projection.aspect();
 
         let params = gl::DrawParameters {
-            depth: Default::default(),
-            line_width: Some(1.0),
             blend: gl::Blend::alpha_blending(),
             ..Default::default()
         };
@@ -324,6 +343,7 @@ where
                     perspective: perspective,
                     view: view,
                     color_vec: [1.0f32, 0.0, 0.0, 1.0],
+                    aspect: aspect,
                 },
                 &params,
             )

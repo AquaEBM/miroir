@@ -113,13 +113,13 @@ impl CameraController {
 
     #[rustfmt::skip]
     pub fn process_keyboard(&mut self, key: VirtualKeyCode, state: ElementState) -> bool {
-        let amount = (state == ElementState::Pressed) as u32 as f32;
-
-        let mut res = true;
-
         const RATIO: f32 = 0.8;
 
         use VirtualKeyCode::*;
+
+        let amount = (state == ElementState::Pressed) as u32 as f32;
+
+        let mut res = true;
 
         match key {
             Z | W  => self.amount_forward = amount,

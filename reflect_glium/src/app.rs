@@ -1,6 +1,7 @@
 use super::*;
 
 use gl::index::{NoIndices, PrimitiveType};
+use nalgebra::{ComplexField, SVector};
 const LINE_STRIP: NoIndices = NoIndices(PrimitiveType::LineStrip);
 
 pub struct App<const D: usize> {
@@ -11,7 +12,7 @@ pub struct App<const D: usize> {
     starting_pts_program: gl::Program,
 }
 
-const FRAGMENT_SHADER_SRC: &str = r#"
+const FRAGMENT_SHADER_SRC: &str = r"
     #version 140
 
     uniform vec4 color_vec;
@@ -21,9 +22,9 @@ const FRAGMENT_SHADER_SRC: &str = r#"
     void main() {
         color = color_vec;
     }
-"#;
+";
 
-const STARTING_POINT_GEOMETRY_SHADER_SRC: &str = r#"
+const STARTING_POINT_GEOMETRY_SHADER_SRC: &str = r"
     #version 330
 
     layout (points) in;
@@ -63,23 +64,26 @@ const STARTING_POINT_GEOMETRY_SHADER_SRC: &str = r#"
         EmitVertex();
         EndPrimitive();
     }
-"#;
+";
 
 impl<const D: usize> App<D>
 where
     Vertex<D>: gl::Vertex,
 {
-    pub(crate) fn from_simulation<
-        M: Mirror<D> + OpenGLRenderable + ?Sized,
-        R: IntoIterator<Item = Ray<D>>,
-    >(
+    pub(crate) fn from_simulation<M, R>(
         mirror: &M,
         rays: R,
         reflection_limit: Option<usize>,
         display: &gl::Display,
-    ) -> Self {
+        eps: <M::Scalar as ComplexField>::RealField,
+    ) -> Self
+    where
+        M: Mirror<D> + OpenGLRenderable + ?Sized,
+        R: IntoIterator<Item = Ray<M::Scalar, D>>,
+        Vertex<D>: From<SVector<M::Scalar, D>>,
+    {
         let vertex_shader = if D == 2 {
-            r#"
+            r"
             #version 140
 
             in vec2 position;
@@ -89,9 +93,9 @@ where
             void main() {
                 gl_Position = perspective * view * vec4(position, 0.0, 1.0);
             }
-        "#
+        "
         } else if D == 3 {
-            r#"
+            r"
             #version 140
 
             in vec3 position;
@@ -101,7 +105,7 @@ where
             void main() {
                 gl_Position = perspective * view * vec4(position, 1.0);
             }
-        "#
+        "
         } else {
             unreachable!()
         };
@@ -131,19 +135,19 @@ where
         let mut ray_paths: Vec<_> = rays
             .into_iter()
             .map(|ray| {
-                let origin = ray.origin.into();
+                let origin = ray.origin.clone().into();
 
                 ray_origins.push(origin);
 
                 vertex_scratch.clear();
                 vertex_scratch.push(origin);
 
-                let path = RayPath::new(mirror, ray).map(Vertex::from);
+                let path = RayPath::new(mirror, ray, eps.clone()).map(Vertex::from);
 
                 if let Some(n) = reflection_limit {
-                    vertex_scratch.extend(path.take(n))
+                    vertex_scratch.extend(path.take(n));
                 } else {
-                    vertex_scratch.extend(path)
+                    vertex_scratch.extend(path);
                 }
 
                 gl::VertexBuffer::immutable(display, &vertex_scratch).unwrap()
@@ -165,14 +169,16 @@ where
         const DEFAULT_CAMERA_POS: cg::Point3<f32> = cg::Point3::new(0., 0., 5.);
         const DEFAULT_CAMERA_YAW: cg::Deg<f32> = cg::Deg(-90.);
         const DEFAULT_CAMERA_PITCH: cg::Deg<f32> = cg::Deg(0.);
-
-        let mut camera = Camera::new(DEFAULT_CAMERA_POS, DEFAULT_CAMERA_YAW, DEFAULT_CAMERA_PITCH);
-
+        const SPEED: f32 = 5.;
+        const MOUSE_SENSITIVITY: f32 = 1.0;
         const DEFAULT_PROJECCTION_POV: cg::Deg<f32> = cg::Deg(85.);
         const NEAR_PLANE: f32 = 0.0001;
         const FAR_PLANE: f32 = 10000.;
 
         use glutin::{dpi, event, event_loop, window};
+
+        let mut camera = Camera::new(DEFAULT_CAMERA_POS, DEFAULT_CAMERA_YAW, DEFAULT_CAMERA_PITCH);
+
         let dpi::PhysicalSize { width, height } = display.gl_window().window().inner_size();
 
         let mut projection = Projection::new(
@@ -182,9 +188,6 @@ where
             NEAR_PLANE,
             FAR_PLANE,
         );
-
-        const SPEED: f32 = 5.;
-        const MOUSE_SENSITIVITY: f32 = 1.0;
 
         let mut camera_controller = CameraController::new(SPEED, MOUSE_SENSITIVITY);
 
@@ -200,7 +203,7 @@ where
                         projection.resize(physical_size.width, physical_size.height);
                     }
 
-                    display.gl_window().resize(physical_size)
+                    display.gl_window().resize(physical_size);
                 }
                 event::WindowEvent::MouseWheel { delta, .. } => {
                     camera_controller.set_scroll(&delta);

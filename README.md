@@ -15,7 +15,7 @@ The `reflect_mirrors` crate contains several example implementations of reflecti
 There are integrations extending this library with more functionality such as:
 
 - `reflect_glium` Which enables running and visualising 2D and 3D simulations using OpenGL.
-- `reflect_json` Which enables serialisation/deserialisation of simulation data with the JSON format. Some example simulations in their JSON representation can be found in the `assets` directory.
+- `reflect_json` Which enables serialisation/deserialisation of simulation data with the JSON format.
 
 Other third-party integrations can easily be created over the simple API of the `reflect` crate. It is advised to check it's documentation:
 

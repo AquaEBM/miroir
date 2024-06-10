@@ -7,4 +7,3 @@ edition = "2021"
 
 reflect = { path = "../reflect" }
 reflect_glium = { path = "../reflect_glium" }
-reflect_json = { path = "../reflect_json" }

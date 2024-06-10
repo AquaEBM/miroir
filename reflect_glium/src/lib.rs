@@ -8,7 +8,7 @@ pub use glium_shapes as gl_shapes;
 
 use cgmath as cg;
 use gl::glutin;
-use nalgebra as na;
+use nalgebra::{self as na, ComplexField, SVector};
 use reflect::*;
 
 mod app;
@@ -20,6 +20,12 @@ use camera::{Camera, CameraController, Projection};
 #[derive(Copy, Clone, Debug)]
 pub struct Vertex<const N: usize> {
     pub position: [f32; N],
+}
+
+impl<const D: usize> Default for Vertex<D> {
+    fn default() -> Self {
+        Self { position: [0.; D] }
+    }
 }
 
 pub type Vertex2D = Vertex<2>;
@@ -42,33 +48,35 @@ impl<const D: usize> From<na::SVector<f64, D>> for Vertex<D> {
     }
 }
 
-pub fn run_simulation<
-    const D: usize,
-    M: Mirror<D> + OpenGLRenderable + ?Sized,
-    R: IntoIterator<Item = Ray<D>>,
->(
+pub fn run_simulation<const D: usize, M, R>(
     mirror: &M,
     rays: R,
     reflection_limit: Option<usize>,
+    default_eps: <M::Scalar as ComplexField>::RealField,
 ) where
+    M: Mirror<D> + OpenGLRenderable + ?Sized,
+    R: IntoIterator<Item = Ray<M::Scalar, D>>,
     Vertex<D>: gl::Vertex,
+    Vertex<D>: From<SVector<M::Scalar, D>>,
 {
     const DEFAULT_WIDTH: u32 = 1280;
     const DEFAULT_HEIGHT: u32 = 720;
 
-    let el = glutin::event_loop::EventLoop::new();
+    use glutin::{dpi, event_loop, window, ContextBuilder};
+
+    let el = event_loop::EventLoop::default();
     let display = gl::Display::new(
-        glutin::window::WindowBuilder::new()
-            .with_inner_size(glutin::dpi::LogicalSize::new(DEFAULT_WIDTH, DEFAULT_HEIGHT))
+        window::WindowBuilder::new()
+            .with_inner_size(dpi::LogicalSize::new(DEFAULT_WIDTH, DEFAULT_HEIGHT))
             .with_title("Reflect"),
-        glutin::ContextBuilder::new()
+        ContextBuilder::new()
             .with_vsync(true)
             .with_multisampling(1 << 8),
         &el,
     )
     .expect("failed to build display");
 
-    let app = App::from_simulation(mirror, rays, reflection_limit, &display);
+    let app = App::from_simulation(mirror, rays, reflection_limit, &display, default_eps);
 
     app.run(display, el);
 }
@@ -123,22 +131,22 @@ impl<T> List<T> {
 
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
-        self.0.reserve(additional)
+        self.0.reserve(additional);
     }
 
     #[inline]
     pub fn reserve_exact(&mut self, additional: usize) {
-        self.0.reserve_exact(additional)
+        self.0.reserve_exact(additional);
     }
 
     #[inline]
     pub fn push(&mut self, v: T) {
-        self.0.push(v)
+        self.0.push(v);
     }
 
     #[inline]
     pub fn append(&mut self, vec: &mut Vec<T>) {
-        self.0.append(vec)
+        self.0.append(vec);
     }
 
     #[inline]
@@ -146,14 +154,14 @@ impl<T> List<T> {
     where
         T: Clone,
     {
-        self.0.extend_from_slice(slice)
+        self.0.extend_from_slice(slice);
     }
 }
 
 impl<T> Extend<T> for List<T> {
     #[inline]
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
-        self.0.extend(iter)
+        self.0.extend(iter);
     }
 }
 
@@ -164,7 +172,7 @@ impl<T> From<Vec<T>> for List<T> {
     }
 }
 
-#[impl_trait_for_tuples::impl_for_tuples(32)]
+#[impl_trait_for_tuples::impl_for_tuples(4)]
 pub trait OpenGLRenderable {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>);
 }
@@ -172,13 +180,13 @@ pub trait OpenGLRenderable {
 impl<T: OpenGLRenderable> OpenGLRenderable for [T] {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         self.iter()
-            .for_each(|a| a.append_render_data(display, list))
+            .for_each(|a| a.append_render_data(display, list));
     }
 }
 
 impl<const N: usize, T: OpenGLRenderable> OpenGLRenderable for [T; N] {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        self.as_slice().append_render_data(display, list)
+        self.as_slice().append_render_data(display, list);
     }
 }
 
@@ -187,93 +195,36 @@ impl<const N: usize, T: OpenGLRenderable> OpenGLRenderable for [T; N] {
 
 impl<T: OpenGLRenderable + ?Sized> OpenGLRenderable for Box<T> {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        self.deref().append_render_data(display, list)
+        self.deref().append_render_data(display, list);
     }
 }
 
 impl<T: OpenGLRenderable + ?Sized> OpenGLRenderable for Arc<T> {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        self.deref().append_render_data(display, list)
+        self.deref().append_render_data(display, list);
     }
 }
 
 impl<T: OpenGLRenderable + ?Sized> OpenGLRenderable for Rc<T> {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        self.deref().append_render_data(display, list)
+        self.deref().append_render_data(display, list);
     }
 }
 
 impl<T: OpenGLRenderable> OpenGLRenderable for Vec<T> {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        self.deref().append_render_data(display, list)
+        self.deref().append_render_data(display, list);
     }
 }
 
 impl<'a, T: OpenGLRenderable + ?Sized> OpenGLRenderable for &'a T {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        (*self).append_render_data(display, list)
+        (*self).append_render_data(display, list);
     }
 }
 
 impl<'a, T: OpenGLRenderable + ?Sized> OpenGLRenderable for &'a mut T {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        self.deref().append_render_data(display, list)
-    }
-}
-
-pub struct Circle {
-    pub vertices: gl::VertexBuffer<Vertex2D>,
-}
-
-impl Circle {
-    pub fn new(center: [f32; 2], radius: f32, display: &gl::Display) -> Self {
-        const NUM_POINTS: usize = 360;
-
-        let c = na::SVector::from(center);
-
-        use core::f32::consts::TAU;
-
-        let points: Vec<Vertex2D> = (0..NUM_POINTS)
-            .map(|i| {
-                let pos: [f32; 2] = (i as f32 / NUM_POINTS as f32 * TAU).sin_cos().into();
-                (na::SVector::from(pos) * radius + c).into()
-            })
-            .collect();
-
-        let vertices = gl::VertexBuffer::immutable(display, points.as_slice()).unwrap();
-
-        Self { vertices }
-    }
-}
-
-impl RenderData for Circle {
-    fn vertices(&self) -> gl::vertex::VerticesSource {
-        (&self.vertices).into()
-    }
-
-    fn indices(&self) -> gl::index::IndicesSource {
-        gl::index::IndicesSource::NoIndices {
-            primitives: gl::index::PrimitiveType::LineLoop,
-        }
-    }
-}
-
-pub struct FilledCircle(Circle);
-
-impl From<Circle> for FilledCircle {
-    fn from(value: Circle) -> Self {
-        Self(value)
-    }
-}
-
-impl RenderData for FilledCircle {
-    fn vertices(&self) -> gl::vertex::VerticesSource {
-        self.0.vertices()
-    }
-
-    fn indices(&self) -> gl::index::IndicesSource {
-        gl::index::IndicesSource::NoIndices {
-            primitives: gl::index::PrimitiveType::TriangleFan,
-        }
+        self.deref().append_render_data(display, list);
     }
 }

@@ -3,9 +3,7 @@
 members = [
     "reflect",
     "reflect_glium",
-    "reflect_json",
     "reflect_mirrors",
-    "run_sim_json"
 ]
 
 resolver = "2"

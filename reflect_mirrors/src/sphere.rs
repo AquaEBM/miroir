@@ -1,141 +1,80 @@
+use core::array;
+use nalgebra::{ComplexField, RealField, Vector2};
+
 use super::*;
 
-#[derive(Clone, Copy)]
-/// All vectors at a certain distance (radius) from a certain vector (center)
+#[derive(Clone, Copy, PartialEq, Debug)]
+/// All points at a certain distance (`radius`) from a certain vector (`center`)
 /// where the distance here is the standard euclidean distance
-// TODO: We can do other distances, can we huh?
-pub struct EuclideanSphereMirror<const D: usize> {
-    pub center: SVector<Float, D>,
-    radius: Float,
+// TODO: We can do other distances, can we?
+pub struct Sphere<S: ComplexField, const D: usize> {
+    pub center: SVector<S, D>,
+    pub radius: S::RealField,
 }
 
-impl<const D: usize> EuclideanSphereMirror<D> {
+impl<S: ComplexField, const D: usize> Sphere<S, D> {
     #[inline]
-    pub fn try_new(center: impl Into<SVector<Float, D>>, radius: impl Into<Float>) -> Option<Self> {
-        let radius = radius.into();
-        (radius.abs() >= Float::EPSILON).then(|| Self {
+    pub fn new(center: impl Into<SVector<S, D>>, radius: impl Into<S::RealField>) -> Self {
+        Self {
             center: center.into(),
-            radius,
-        })
-    }
-
-    #[inline]
-    pub fn new(center: impl Into<SVector<Float, D>>, radius: impl Into<Float>) -> Self {
-        Self::try_new(center, radius).unwrap()
-    }
-
-    #[inline]
-    pub const fn radius(&self) -> &Float {
-        &self.radius
-    }
-
-    #[inline]
-    pub fn set_radius(&mut self, r: Float) -> bool {
-        let ok = r.abs() >= Float::EPSILON;
-
-        if ok {
-            self.radius = r;
+            radius: radius.into(),
         }
-
-        ok
     }
-}
 
-impl<const D: usize> Mirror<D> for EuclideanSphereMirror<D> {
-    fn add_tangents(&self, ctx: &mut SimulationCtx<D>) {
-        // substituting V for P + t * D in the sphere equation: ||V - C||^2 - r^2 = 0
-        // results in a quadratic equation in t, solve it using the discriminant method and
-        // return the vector pointing from the center of the sphere to the point of intersection
-        // as it is orthogonal to the direction space of the tangent to the sphere at that point
-        // the process is almost the same for every quadric shape (see cylinder)
+    pub fn intersections(&self, ray: &Ray<S, D>) -> Option<[S::RealField; 2]> {
+        // substituting `V` for `P + t * D` in the sphere equation:
+        // `||V - C||^2 = r^2` results in a quadratic equation in `t`.
 
-        let ray = *ctx.ray();
+        let v = &ray.origin - &self.center;
+        let r = self.radius.clone();
 
-        let d = &ray.dir;
+        let b = v.dotc(&ray.dir).real();
+        let c = r.clone().mul_add(-r, v.norm_squared());
 
-        let v0 = &self.center;
-        let v = ray.origin - v0;
+        let delta = b.clone().mul_add(b.clone(), -c);
 
-        let r = self.radius();
-        let s = v.norm_squared();
-
-        let a = d.norm_squared();
-        let b = v.dot(d);
-        let c = r.mul_add(-r, s);
-
-        let delta = c.mul_add(-a, b * b);
-
-        if delta > Float::EPSILON {
+        delta.is_sign_positive().then(move || {
             let root_delta = delta.sqrt();
             let neg_b = -b;
 
-            for t in [(neg_b - root_delta) / a, (neg_b + root_delta) / a] {
-                let origin = ray.at(t);
-                // SAFETY: the vector `origin - v0` always has length `r = self.radius`
-                let normal = Unit::new_unchecked((origin - v0) / r.abs());
+            [neg_b.clone() - root_delta.clone(), neg_b + root_delta]
+        })
+    }
+
+    #[rustfmt::skip]
+    pub fn tangents_at_intersections(
+        &self,
+        ray: &Ray<S, D>,
+    ) -> Option<[(S::RealField, Unit<SVector<S, D>>); 2]> {
+        self.intersections(ray).map(|ds| ds.map(|d| (
+            d.clone(),
+            // SAFETY: p := ray.at(d) is in the sphere,
+            // so ||p - self.center|| = |self.radius|
+            Unit::new_unchecked((ray.at(S::from_real(d)) - self.center.clone()).unscale(self.radius.clone().abs())),
+        )))
+    }
+}
+
+impl<S: ComplexField, const D: usize> Mirror<D> for Sphere<S, D> {
+    type Scalar = S;
+    fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, D>) {
+        if let Some(tangents) = self.tangents_at_intersections(ctx.ray()) {
+            for (d, n) in tangents {
                 ctx.add_tangent(Plane {
-                    intersection: Intersection::Distance(t),
-                    direction: HyperPlane::Normal(normal),
+                    intersection: Intersection::Distance(S::from_real(d)),
+                    direction: HyperPlane::Normal(n),
                 });
             }
         }
     }
 }
 
-impl<const D: usize> JsonType for EuclideanSphereMirror<D> {
-    fn json_type() -> String {
-        "sphere".into()
-    }
-}
-
-impl<const D: usize> JsonDes for EuclideanSphereMirror<D> {
-    /// Deserialize a new eudclidean sphere mirror from a JSON object.
-    ///
-    /// The JSON object must follow the following format:
-    ///
-    /// ```json
-    /// {
-    ///     "center": [1., 2., 3., ...], // (an array of D floats)
-    ///     "radius": 4., // (must be a float of magnitude > Float::EPSILON ~= 10^-16 )
-    /// }
-    /// ```
-    fn from_json(json: &serde_json::Value) -> Result<Self, Box<dyn std::error::Error>> {
-        let center = json
-            .get("center")
-            .and_then(serde_json::Value::as_array)
-            .map(Vec::as_slice)
-            .and_then(json_array_to_vector)
-            .ok_or("Failed to parse center")?;
-
-        let radius = json
-            .get("radius")
-            .and_then(serde_json::Value::as_f64)
-            .ok_or("Failed to parse radius")? as Float;
-
-        Self::try_new(center, radius).ok_or_else(|| "radius must not be too close to 0.0".into())
-    }
-}
-
-impl<const D: usize> JsonSer for EuclideanSphereMirror<D> {
-    /// Serialize a euclidean sphere mirror into a JSON object.
-    ///
-    /// The format of the returned object is explained in [`Self::from_json`]
-    fn to_json(&self) -> serde_json::Value {
-        serde_json::json!({
-            "center": self.center.as_slice(),
-            "radius": self.radius(),
-        })
-    }
-}
-
 // Use glium_shapes::sphere::Sphere for the 3D implementation
-impl OpenGLRenderable for EuclideanSphereMirror<3> {
+impl OpenGLRenderable for Sphere<Float, 3> {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        let r = *self.radius() as f32;
+        let r = self.radius as f32;
         let [x, y, z] = self.center.map(|s| s as f32).into();
 
-        // The default sphere from the SphereBuilder is a unit-sphere (radius of 1) with its center of mass located at the origin.
-        // So we just have to scale it with the sphere radius on each axis and translate it.
         let sphere = gl_shapes::sphere::SphereBuilder::new()
             .scale(r, r, r)
             .translate(x, y, z)
@@ -147,12 +86,46 @@ impl OpenGLRenderable for EuclideanSphereMirror<3> {
     }
 }
 
+struct Circle {
+    vertices: gl::VertexBuffer<Vertex2D>,
+}
+
+impl Circle {
+    fn new<const N: usize>(center: [f32; 2], radius: f32, display: &gl::Display) -> Self {
+        let c = SVector::from(center);
+
+        use core::f32::consts::TAU;
+
+        let points: [_; N] = array::from_fn(|i| {
+            let w = i as f32 / N as f32 * TAU;
+            let p = Vector2::new(w.cos(), w.sin());
+            (p * radius + c).into()
+        });
+
+        let vertices = gl::VertexBuffer::immutable(display, points.as_slice()).unwrap();
+
+        Self { vertices }
+    }
+}
+
+impl RenderData for Circle {
+    fn vertices(&self) -> gl::vertex::VerticesSource {
+        (&self.vertices).into()
+    }
+
+    fn indices(&self) -> gl::index::IndicesSource {
+        gl::index::IndicesSource::NoIndices {
+            primitives: gl::index::PrimitiveType::LineLoop,
+        }
+    }
+}
+
 // in 2d, the list of vertices of a circle is easy to calculate
-impl OpenGLRenderable for EuclideanSphereMirror<2> {
+impl OpenGLRenderable for Sphere<Float, 2> {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        list.push(Box::new(Circle::new(
+        list.push(Box::new(Circle::new::<360>(
             self.center.map(|s| s as f32).into(),
-            *self.radius() as f32,
+            self.radius as f32,
             display,
         )))
     }

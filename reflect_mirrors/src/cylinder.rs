@@ -1,7 +1,7 @@
 use super::*;
 
 /// An open, cylinder-shaped mirror,
-pub struct CylindricalMirror {
+pub struct Cylinder {
     start: SVector<Float, 3>,
     dist: SVector<Float, 3>,
     inv_norm_dist_squared: Float,
@@ -9,38 +9,27 @@ pub struct CylindricalMirror {
     radius_sq: Float,
 }
 
-impl CylindricalMirror {
+impl Cylinder {
     /// Create a new cylinder from a line segment and a radius
     #[inline]
-    pub fn try_new(
-        segment_start: impl Into<SVector<Float, 3>>,
-        segment_end: impl Into<SVector<Float, 3>>,
-        radius: Float,
-    ) -> Option<Self> {
-        const E: Float = Float::EPSILON * 8.0;
-
-        let start = segment_start.into();
-        let end = segment_end.into();
-        let dist = end - start;
-        let dist_sq = dist.norm_squared();
-
-        let r_abs = radius.abs();
-        (dist_sq.sqrt() > E && r_abs > E).then(|| Self {
-            start,
-            dist,
-            radius: r_abs,
-            radius_sq: radius * radius,
-            inv_norm_dist_squared: dist_sq.recip(),
-        })
-    }
-
-    #[inline]
+    #[must_use]
     pub fn new(
         segment_start: impl Into<SVector<Float, 3>>,
         segment_end: impl Into<SVector<Float, 3>>,
         radius: Float,
     ) -> Self {
-        Self::try_new(segment_start, segment_end, radius).unwrap()
+        let start = segment_start.into();
+        let end = segment_end.into();
+        let dist = end - start;
+        let dist_sq = dist.norm_squared();
+
+        Self {
+            start,
+            dist,
+            radius,
+            radius_sq: radius * radius,
+            inv_norm_dist_squared: dist_sq.recip(),
+        }
     }
 
     #[inline]
@@ -71,12 +60,13 @@ impl CylindricalMirror {
     }
 }
 
-impl Mirror<3> for CylindricalMirror {
-    fn add_tangents(&self, ctx: &mut SimulationCtx<3>) {
+impl Mirror<3> for Cylinder {
+    type Scalar = Float;
+    fn add_tangents(&self, ctx: &mut SimulationCtx<Float, 3>) {
         let line_coord = |v| self.dist.dot(&v) * self.inv_norm_dist_squared;
         let p = |v| line_coord(v) * self.dist;
 
-        let ray = *ctx.ray();
+        let ray = ctx.ray().clone();
 
         let m = ray.origin - self.start;
         let d = ray.dir.into_inner();
@@ -89,7 +79,7 @@ impl Mirror<3> for CylindricalMirror {
 
         let delta = c.mul_add(-a, b * b);
 
-        if delta > Float::EPSILON {
+        if delta >= 0. {
             let root_delta = delta.sqrt();
             let neg_b = -b;
 
@@ -102,7 +92,7 @@ impl Mirror<3> for CylindricalMirror {
                 // Thanks clippy!
                 if (0.0..=1.0).contains(&coord) {
                     // SAFETY: the vector `origin - v0` always has length `r = self.radius`
-                    let normal = Unit::new_unchecked((origin - line_pt) / self.radius);
+                    let normal = Unit::new_unchecked((origin - line_pt) / self.radius.abs());
 
                     ctx.add_tangent(Plane {
                         intersection: Intersection::Distance(t),
@@ -111,65 +101,6 @@ impl Mirror<3> for CylindricalMirror {
                 }
             }
         }
-    }
-}
-
-impl JsonType for CylindricalMirror {
-    fn json_type() -> String {
-        "cylinder".into()
-    }
-}
-
-impl JsonDes for CylindricalMirror {
-    /// Deserialize a new cylindrical mirror from a JSON object.
-    ///
-    /// The JSON object must follow the following format:
-    ///
-    /// ```json
-    /// {
-    ///     "start": [1.0, 2.0, 3.0],
-    ///     "end": [4.0, 5.0, 6.0],
-    ///     "radius": 69.0,
-    /// }
-    /// ```
-    fn from_json(json: &serde_json::Value) -> Result<Self, Box<dyn Error>> {
-        let start = json
-            .get("start")
-            .and_then(serde_json::Value::as_array)
-            .map(Vec::as_slice)
-            .and_then(json_array_to_float_array)
-            .ok_or("Failed to parse start")?;
-
-        let end = json
-            .get("end")
-            .and_then(serde_json::Value::as_array)
-            .map(Vec::as_slice)
-            .and_then(json_array_to_float_array)
-            .ok_or("Failed to parse end")?;
-
-        let radius = json
-            .get("radius")
-            .and_then(serde_json::Value::as_f64)
-            .ok_or("Failed to parse radius")? as Float;
-
-        Self::try_new(start, end, radius)
-            .ok_or_else(|| "radius is too small or start and end vectors are too close".into())
-    }
-}
-
-impl JsonSer for CylindricalMirror {
-    /// Serialize a cylindrical mirror into a JSON object.
-    ///
-    /// The format of the returned object is explained in [`Self::from_json`]
-    fn to_json(&self) -> serde_json::Value {
-        let [start, end] = self.line_segment();
-        let radius = self.radius();
-
-        serde_json::json!({
-            "start": start.as_slice(),
-            "end": end.as_slice(),
-            "radius": radius,
-        })
     }
 }
 
@@ -189,7 +120,7 @@ impl RenderData for CylinderRenderData {
     }
 }
 
-impl OpenGLRenderable for CylindricalMirror {
+impl OpenGLRenderable for Cylinder {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         const NUM_POINTS: usize = 360;
 
@@ -213,17 +144,18 @@ impl OpenGLRenderable for CylindricalMirror {
 
         use core::f32::consts::TAU;
 
-        let mut vertices: Vec<_> = (0..NUM_POINTS)
-            .flat_map(|i| {
-                let [x, y]: [f32; 2] = (i as f32 / NUM_POINTS as f32 * TAU).sin_cos().into();
-                let vertex = [x * r, y * r, 0.0];
-                let k = rot * nalgebra::SVector::from(vertex) + start;
-                [k, k + d]
-            })
-            .map(Vertex3D::from)
-            .collect();
+        const NUM_VERTICES: usize = (NUM_POINTS + 1) * 2;
 
-        vertices.extend_from_within(..2);
+        let mut vertices: [_; NUM_VERTICES] = [Default::default(); NUM_VERTICES];
+
+        vertices.chunks_exact_mut(2).enumerate().for_each(|(i, w)| {
+            let [a, b] = w else { unreachable!() };
+
+            let [x, y]: [f32; 2] = (i as f32 / NUM_POINTS as f32 * TAU).sin_cos().into();
+            let vertex = [x * r, y * r, 0.];
+            let k = rot * nalgebra::SVector::from(vertex) + start;
+            (*a, *b) = (k.into(), (k + d).into())
+        });
 
         let vertices = gl::VertexBuffer::immutable(display, vertices.as_slice()).unwrap();
 

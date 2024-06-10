@@ -8,7 +8,9 @@ fn main() {
         LineSegment::new([[-1., -4.], [1., -6.]]),
     ];
 
-    let rays = [Ray::new([0.3, 0.], [1., -0.1])];
+    let rays = [
+        (Ray::new([0.3, 0.], [1., -0.1]), None),
+    ];
 
-    reflect_glium::run_simulation(&mirrors, rays, None, Float::EPSILON * 64.)
+    reflect_glium::run_simulation(&mirrors, rays, Float::EPSILON * 64.)
 }

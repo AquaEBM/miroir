@@ -51,11 +51,10 @@ impl<const D: usize> From<na::SVector<f64, D>> for Vertex<D> {
 pub fn run_simulation<const D: usize, M, R>(
     mirror: &M,
     rays: R,
-    reflection_limit: Option<usize>,
     default_eps: <M::Scalar as ComplexField>::RealField,
 ) where
     M: Mirror<D> + OpenGLRenderable + ?Sized,
-    R: IntoIterator<Item = Ray<M::Scalar, D>>,
+    R: IntoIterator<Item = (Ray<M::Scalar, D>, Option<usize>)>,
     Vertex<D>: gl::Vertex,
     Vertex<D>: From<SVector<M::Scalar, D>>,
 {
@@ -76,7 +75,7 @@ pub fn run_simulation<const D: usize, M, R>(
     )
     .expect("failed to build display");
 
-    let app = App::from_simulation(mirror, rays, reflection_limit, &display, default_eps);
+    let app = App::from_simulation(mirror, rays, &display, default_eps);
 
     app.run(display, el);
 }

@@ -31,6 +31,8 @@ fn main() {
         ],
     );
 
-    let rays = [Ray::new([4., 3., 0.1], [-1., -1., 0.])];
-    reflect_glium::run_simulation(&mirrors, rays, Some(reflection_cap), Float::EPSILON * 64.);
+    let rays = [
+        (Ray::new([4., 3., 0.1], [-1., -1., 0.]), Some(reflection_cap)),
+    ];
+    reflect_glium::run_simulation(&mirrors, rays, Float::EPSILON * 64.);
 }

@@ -73,13 +73,12 @@ where
     pub(crate) fn from_simulation<M, R>(
         mirror: &M,
         rays: R,
-        reflection_limit: Option<usize>,
         display: &gl::Display,
         eps: <M::Scalar as ComplexField>::RealField,
     ) -> Self
     where
         M: Mirror<D> + OpenGLRenderable + ?Sized,
-        R: IntoIterator<Item = Ray<M::Scalar, D>>,
+        R: IntoIterator<Item = (Ray<M::Scalar, D>, Option<usize>)>,
         Vertex<D>: From<SVector<M::Scalar, D>>,
     {
         let vertex_shader = if D == 2 {
@@ -134,7 +133,7 @@ where
 
         let mut ray_paths: Vec<_> = rays
             .into_iter()
-            .map(|ray| {
+            .map(|(ray, max_reflections)| {
                 let origin = ray.origin.clone().into();
 
                 ray_origins.push(origin);
@@ -144,7 +143,7 @@ where
 
                 let path = RayPath::new(mirror, ray, eps.clone()).map(Vertex::from);
 
-                if let Some(n) = reflection_limit {
+                if let Some(n) = max_reflections {
                     vertex_scratch.extend(path.take(n));
                 } else {
                     vertex_scratch.extend(path);

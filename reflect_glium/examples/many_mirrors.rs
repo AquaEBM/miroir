@@ -46,7 +46,9 @@ fn main() {
         line([[10.455, 1.74], [7.395, 1.62]]),
     ];
 
-    let rays = [Ray::new([9., 5.], [1., 2.])];
+    let rays = [
+        (Ray::new([9., 5.], [1., 2.]), None),
+    ];
 
-    reflect_glium::run_simulation(&mirrors, rays, None, Float::EPSILON * 64.)
+    reflect_glium::run_simulation(&mirrors, rays, Float::EPSILON * 64.)
 }

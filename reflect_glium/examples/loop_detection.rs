@@ -13,10 +13,10 @@ fn main() {
     );
 
     let rays = [
-        Ray::new([0., 0.], [1., 1.]),
-        Ray::new([0., 0.], [1., 0.]),
-        Ray::new([4., 0.5], [1., 0.]),
+        (Ray::new([0., 0.], [1., 1.]), Some(5)),
+        (Ray::new([0., 0.], [1., 0.]), Some(5)),
+        (Ray::new([4., 0.5], [1., 0.]), Some(5)),
     ];
 
-    reflect_glium::run_simulation(&mirrors, rays, Some(5), Float::EPSILON * 64.);
+    reflect_glium::run_simulation(&mirrors, rays, Float::EPSILON * 64.);
 }

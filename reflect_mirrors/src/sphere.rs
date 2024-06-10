@@ -1,35 +1,45 @@
-use core::array;
-use nalgebra::{ComplexField, Vector2};
+use nalgebra::ComplexField;
 
 use super::*;
 
-#[derive(Clone, Copy, PartialEq, Debug)]
 /// All points at a certain distance (`radius`) from a certain vector (`center`)
 /// where the distance here is the standard euclidean distance
 // TODO: We can do other distances, can we?
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Sphere<S: ComplexField, const D: usize> {
     pub center: SVector<S, D>,
-    pub radius: S::RealField,
+    radius: S::RealField,
+    radius_sq: S::RealField,
 }
 
 impl<S: ComplexField, const D: usize> Sphere<S, D> {
     #[inline]
     pub fn new(center: impl Into<SVector<S, D>>, radius: impl Into<S::RealField>) -> Self {
+        let radius = radius.into();
         Self {
             center: center.into(),
-            radius: radius.into(),
+            radius: radius.clone().abs(),
+            radius_sq: radius.clone() * radius,
         }
+    }
+
+    pub fn radius(&self) -> &S::RealField {
+        &self.radius
+    }
+
+    pub fn set_radius(&mut self, r: S::RealField) {
+        self.radius = r.clone().abs();
+        self.radius_sq = r.clone() * r;
     }
 
     pub fn intersections(&self, ray: &Ray<S, D>) -> Option<[S; 2]> {
         // substituting `V` for `P + t * D` in the sphere equation:
         // `||V - C||^2 = r^2` results in a quadratic equation in `t`.
 
-        let v = ray.origin.clone() - self.center.clone();
-        let r = self.radius.clone();
+        let v = &ray.origin - &self.center;
 
         let b = v.dotc(&ray.dir).real();
-        let c = r.clone().mul_add(-r, v.norm_squared());
+        let c = v.norm_squared() - self.radius_sq.clone();
 
         let delta = b.clone().mul_add(b.clone(), -c);
 
@@ -65,67 +75,5 @@ impl<S: ComplexField, const D: usize> Mirror<D> for Sphere<S, D> {
                 });
             }
         }
-    }
-}
-
-// Use glium_shapes::sphere::Sphere for the 3D implementation
-impl OpenGLRenderable for Sphere<Float, 3> {
-    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        let r = self.radius as f32;
-        let [x, y, z] = self.center.map(|s| s as f32).into();
-
-        let sphere = gl_shapes::sphere::SphereBuilder::new()
-            .scale(r, r, r)
-            .translate(x, y, z)
-            .with_divisions(60, 60)
-            .build(display)
-            .unwrap();
-
-        list.push(Box::new(sphere))
-    }
-}
-
-struct Circle {
-    vertices: gl::VertexBuffer<Vertex2D>,
-}
-
-impl Circle {
-    fn new<const N: usize>(center: [f32; 2], radius: f32, display: &gl::Display) -> Self {
-        let c = SVector::from(center);
-
-        use core::f32::consts::TAU;
-
-        let points: [_; N] = array::from_fn(|i| {
-            let w = i as f32 / N as f32 * TAU;
-            let p = Vector2::new(w.cos(), w.sin());
-            (p * radius + c).into()
-        });
-
-        let vertices = gl::VertexBuffer::immutable(display, points.as_slice()).unwrap();
-
-        Self { vertices }
-    }
-}
-
-impl RenderData for Circle {
-    fn vertices(&self) -> gl::vertex::VerticesSource {
-        (&self.vertices).into()
-    }
-
-    fn indices(&self) -> gl::index::IndicesSource {
-        gl::index::IndicesSource::NoIndices {
-            primitives: gl::index::PrimitiveType::LineLoop,
-        }
-    }
-}
-
-// in 2d, the list of vertices of a circle is easy to calculate
-impl OpenGLRenderable for Sphere<Float, 2> {
-    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        list.push(Box::new(Circle::new::<360>(
-            self.center.map(|s| s as f32).into(),
-            self.radius as f32,
-            display,
-        )))
     }
 }

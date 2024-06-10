@@ -3,7 +3,10 @@
 extern crate alloc;
 
 use alloc::{boxed::Box, rc::Rc, sync::Arc, vec::Vec};
-use core::{fmt::Debug, ops::{Add, Deref}};
+use core::{
+    fmt::Debug,
+    ops::{Add, Deref},
+};
 
 pub use nalgebra;
 
@@ -33,16 +36,19 @@ impl<S, const D: usize> Ray<S, D> {
     pub fn new_unit_dir(origin: impl Into<SVector<S, D>>, dir: Unit<SVector<S, D>>) -> Self {
         Self {
             origin: origin.into(),
-            dir
+            dir,
         }
     }
 
     #[inline]
     #[must_use]
-    pub fn new_unchecked_dir(origin: impl Into<SVector<S, D>>, dir: impl Into<SVector<S, D>>) -> Self {
+    pub fn new_unchecked_dir(
+        origin: impl Into<SVector<S, D>>,
+        dir: impl Into<SVector<S, D>>,
+    ) -> Self {
         Self {
             origin: origin.into(),
-            dir: Unit::new_unchecked(dir.into())
+            dir: Unit::new_unchecked(dir.into()),
         }
     }
 }
@@ -93,7 +99,11 @@ impl<S: ComplexField, const D: usize> SimulationCtx<S, D> {
     #[inline]
     #[must_use]
     const fn new(ray: Ray<S, D>, eps: S::RealField) -> Self {
-        Self { ray, closest: None, eps }
+        Self {
+            ray,
+            closest: None,
+            eps,
+        }
     }
 
     #[inline]
@@ -106,14 +116,18 @@ impl<S: ComplexField, const D: usize> SimulationCtx<S, D> {
     ///
     /// if `tangent` is parallel to `self.ray()`.
     pub fn add_tangent(&mut self, tangent: Plane<S, D>) {
-
         let w = tangent
             .try_ray_intersection(self.ray())
             .expect("a mirror returned a plane parallel to the ray: aborting");
 
         let d = w.clone().real();
 
-        if d >= self.eps && self.closest.as_ref().map_or(true, |(t, _)| t.clone().real() > d) {
+        if d >= self.eps
+            && self
+                .closest
+                .as_ref()
+                .map_or(true, |(t, _)| t.clone().real() > d)
+        {
             self.closest = Some((w, tangent.direction));
         }
     }
@@ -252,11 +266,7 @@ impl<S: SimdComplexField, const D: usize> HyperPlaneBasisOrtho<S, D> {
     /// hyperplane stating at `v0`, and directed by `self`.
     #[inline]
     #[must_use]
-    pub fn closest_point_to_plane(
-        &self,
-        v0: &SVector<S, D>,
-        p: &SVector<S, D>,
-    ) -> SVector<S, D> {
+    pub fn closest_point_to_plane(&self, v0: &SVector<S, D>, p: &SVector<S, D>) -> SVector<S, D> {
         let v = p - v0;
         v0 + self.project(&v)
     }
@@ -318,7 +328,6 @@ impl<S: SimdComplexField, const D: usize> HyperPlane<S, D> {
     #[inline]
     #[must_use]
     pub fn reflect(&self, v: &SVector<S, D>) -> SVector<S, D> {
-
         #[inline]
         fn two<S: Clone + Add<Output = S>>(s: S) -> S {
             s.clone() + s
@@ -359,7 +368,9 @@ impl<S: ComplexField, const D: usize> HyperPlane<S, D> {
     #[must_use]
     pub fn try_ray_intersection(&self, v0: &SVector<S, D>, ray: &Ray<S, D>) -> Option<S> {
         match self {
-            Self::Plane(plane) => plane.intersection_coordinates(ray, v0).map(|v| v[0].clone()),
+            Self::Plane(plane) => plane
+                .intersection_coordinates(ray, v0)
+                .map(|v| v[0].clone()),
             Self::Normal(normal) => {
                 let u = ray.dir.dot(normal);
                 (!u.is_zero()).then(|| (v0 - &ray.origin).dot(normal) / u)
@@ -523,14 +534,18 @@ impl<'a, const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for &'a mut T {
     }
 }
 
-pub struct RayPath<'a, const D: usize, M: Mirror<D> +?Sized> {
+pub struct RayPath<'a, const D: usize, M: Mirror<D> + ?Sized> {
     pub(crate) ctx: SimulationCtx<M::Scalar, D>,
     pub(crate) mirror: &'a M,
 }
 
 impl<'a, const D: usize, M: Mirror<D> + ?Sized> RayPath<'a, D, M> {
     #[inline]
-    pub const fn new(mirror: &'a M, ray: Ray<M::Scalar, D>, eps: <M::Scalar as ComplexField>::RealField) -> Self {
+    pub const fn new(
+        mirror: &'a M,
+        ray: Ray<M::Scalar, D>,
+        eps: <M::Scalar as ComplexField>::RealField,
+    ) -> Self {
         Self {
             ctx: SimulationCtx::new(ray, eps),
             mirror,

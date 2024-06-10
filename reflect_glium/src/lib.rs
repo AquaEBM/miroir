@@ -13,6 +13,9 @@ use reflect::*;
 
 mod app;
 mod camera;
+mod renderable;
+
+pub use renderable::*;
 
 use app::App;
 use camera::{Camera, CameraController, Projection};
@@ -70,7 +73,7 @@ pub fn run_simulation<const D: usize, M, R>(
             .with_title("Reflect"),
         ContextBuilder::new()
             .with_vsync(true)
-            .with_multisampling(1 << 8),
+            .with_multisampling(1 << 4),
         &el,
     )
     .expect("failed to build display");
@@ -78,152 +81,4 @@ pub fn run_simulation<const D: usize, M, R>(
     let app = App::from_simulation(mirror, rays, &display, default_eps);
 
     app.run(display, el);
-}
-
-/// A trait encompassing a shape that can be rendered
-///
-/// Mirrors implementing [`OpenGLRenderable`] return objects for this trait enabling them to be rendered
-/// on-screen in simulations.
-pub trait RenderData {
-    fn vertices(&self) -> gl::vertex::VerticesSource;
-    fn indices(&self) -> gl::index::IndicesSource;
-}
-
-// glium_shapes 3d convenience blanket impl
-impl<T> RenderData for T
-where
-    for<'a> &'a T: Into<gl::vertex::VerticesSource<'a>>,
-    for<'a> &'a T: Into<gl::index::IndicesSource<'a>>,
-{
-    fn vertices(&self) -> gl::vertex::VerticesSource {
-        self.into()
-    }
-
-    fn indices(&self) -> gl::index::IndicesSource {
-        self.into()
-    }
-}
-
-/// A wrapper around a `Vec<T>` that only allows pushing/appending/extending etc...
-pub struct List<T>(Vec<T>);
-
-impl<T> List<T> {
-    #[inline]
-    pub fn into_inner(self) -> Vec<T> {
-        self.0
-    }
-
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        self.0.capacity()
-    }
-
-    #[inline]
-    pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
-        self.0.try_reserve(additional)
-    }
-
-    #[inline]
-    pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), TryReserveError> {
-        self.0.try_reserve_exact(additional)
-    }
-
-    #[inline]
-    pub fn reserve(&mut self, additional: usize) {
-        self.0.reserve(additional);
-    }
-
-    #[inline]
-    pub fn reserve_exact(&mut self, additional: usize) {
-        self.0.reserve_exact(additional);
-    }
-
-    #[inline]
-    pub fn push(&mut self, v: T) {
-        self.0.push(v);
-    }
-
-    #[inline]
-    pub fn append(&mut self, vec: &mut Vec<T>) {
-        self.0.append(vec);
-    }
-
-    #[inline]
-    pub fn extend_from_slice(&mut self, slice: &[T])
-    where
-        T: Clone,
-    {
-        self.0.extend_from_slice(slice);
-    }
-}
-
-impl<T> Extend<T> for List<T> {
-    #[inline]
-    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
-        self.0.extend(iter);
-    }
-}
-
-impl<T> From<Vec<T>> for List<T> {
-    #[inline]
-    fn from(value: Vec<T>) -> Self {
-        Self(value)
-    }
-}
-
-#[impl_trait_for_tuples::impl_for_tuples(1, 16)]
-pub trait OpenGLRenderable {
-    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>);
-}
-
-impl<T: OpenGLRenderable> OpenGLRenderable for [T] {
-    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        self.iter()
-            .for_each(|a| a.append_render_data(display, list));
-    }
-}
-
-impl<const N: usize, T: OpenGLRenderable> OpenGLRenderable for [T; N] {
-    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        self.as_slice().append_render_data(display, list);
-    }
-}
-
-// It's clear that all these impls use the `Deref` trait, but writing a blanket impl over all
-// types implementing `Deref` makes the trait unusable downstream
-
-impl<T: OpenGLRenderable + ?Sized> OpenGLRenderable for Box<T> {
-    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        self.deref().append_render_data(display, list);
-    }
-}
-
-impl<T: OpenGLRenderable + ?Sized> OpenGLRenderable for Arc<T> {
-    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        self.deref().append_render_data(display, list);
-    }
-}
-
-impl<T: OpenGLRenderable + ?Sized> OpenGLRenderable for Rc<T> {
-    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        self.deref().append_render_data(display, list);
-    }
-}
-
-impl<T: OpenGLRenderable> OpenGLRenderable for Vec<T> {
-    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        self.deref().append_render_data(display, list);
-    }
-}
-
-impl<'a, T: OpenGLRenderable + ?Sized> OpenGLRenderable for &'a T {
-    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        (*self).append_render_data(display, list);
-    }
-}
-
-impl<'a, T: OpenGLRenderable + ?Sized> OpenGLRenderable for &'a mut T {
-    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        self.deref().append_render_data(display, list);
-    }
 }

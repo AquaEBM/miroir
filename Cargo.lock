@@ -1260,7 +1260,6 @@ name = "reflect_mirrors"
 version = "0.1.0"
 dependencies = [
  "reflect",
- "reflect_glium",
 ]
 
 [[package]]

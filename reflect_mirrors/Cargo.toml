@@ -6,4 +6,3 @@ edition = "2021"
 [dependencies]
 
 reflect = { path = "../reflect" }
-reflect_glium = { path = "../reflect_glium" }

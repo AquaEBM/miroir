@@ -10,7 +10,4 @@ glium_shapes = { git = "https://github.com/FlashOnFire/glium_shapes.git", branch
 reflect = { path = "../reflect" }
 cgmath = "0.18"
 impl-trait-for-tuples = "0.2"
-
-[dev-dependencies]
-
 reflect_mirrors = { path = "../reflect_mirrors" }

@@ -172,7 +172,7 @@ impl<T> From<Vec<T>> for List<T> {
     }
 }
 
-#[impl_trait_for_tuples::impl_for_tuples(1, 32)]
+#[impl_trait_for_tuples::impl_for_tuples(1, 16)]
 pub trait OpenGLRenderable {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>);
 }

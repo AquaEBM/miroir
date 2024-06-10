@@ -1,5 +1,5 @@
 use core::array;
-use nalgebra::{ComplexField, RealField, Vector2};
+use nalgebra::{ComplexField, Vector2};
 
 use super::*;
 
@@ -21,11 +21,11 @@ impl<S: ComplexField, const D: usize> Sphere<S, D> {
         }
     }
 
-    pub fn intersections(&self, ray: &Ray<S, D>) -> Option<[S::RealField; 2]> {
+    pub fn intersections(&self, ray: &Ray<S, D>) -> Option<[S; 2]> {
         // substituting `V` for `P + t * D` in the sphere equation:
         // `||V - C||^2 = r^2` results in a quadratic equation in `t`.
 
-        let v = &ray.origin - &self.center;
+        let v = ray.origin.clone() - self.center.clone();
         let r = self.radius.clone();
 
         let b = v.dotc(&ray.dir).real();
@@ -33,11 +33,10 @@ impl<S: ComplexField, const D: usize> Sphere<S, D> {
 
         let delta = b.clone().mul_add(b.clone(), -c);
 
-        delta.is_sign_positive().then(move || {
-            let root_delta = delta.sqrt();
-            let neg_b = -b;
+        S::from_real(delta).try_sqrt().map(move |root| {
+            let neg_b = S::from_real(-b);
 
-            [neg_b.clone() - root_delta.clone(), neg_b + root_delta]
+            [neg_b.clone() - root.clone(), neg_b + root]
         })
     }
 
@@ -45,12 +44,12 @@ impl<S: ComplexField, const D: usize> Sphere<S, D> {
     pub fn tangents_at_intersections(
         &self,
         ray: &Ray<S, D>,
-    ) -> Option<[(S::RealField, Unit<SVector<S, D>>); 2]> {
+    ) -> Option<[(S, Unit<SVector<S, D>>); 2]> {
         self.intersections(ray).map(|ds| ds.map(|d| (
             d.clone(),
             // SAFETY: p := ray.at(d) is in the sphere,
             // so ||p - self.center|| = |self.radius|
-            Unit::new_unchecked((ray.at(S::from_real(d)) - self.center.clone()).unscale(self.radius.clone().abs())),
+            Unit::new_unchecked((ray.at(d) - self.center.clone()).unscale(self.radius.clone().abs())),
         )))
     }
 }
@@ -61,7 +60,7 @@ impl<S: ComplexField, const D: usize> Mirror<D> for Sphere<S, D> {
         if let Some(tangents) = self.tangents_at_intersections(ctx.ray()) {
             for (d, n) in tangents {
                 ctx.add_tangent(Plane {
-                    intersection: Intersection::Distance(S::from_real(d)),
+                    intersection: Intersection::Distance(d),
                     direction: HyperPlane::Normal(n),
                 });
             }

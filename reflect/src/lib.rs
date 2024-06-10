@@ -23,7 +23,7 @@ pub struct Ray<S, const D: usize> {
 // Unit<Vector<T>>: PartialEq has an extra (useless?) requirement of T: Scalar
 impl<S: PartialEq, const D: usize> PartialEq for Ray<S, D> {
     fn eq(&self, other: &Self) -> bool {
-        &self.origin == &other.origin && self.dir.as_ref() == other.dir.as_ref()
+        self.origin == other.origin && self.dir.as_ref() == other.dir.as_ref()
     }
 }
 
@@ -48,7 +48,6 @@ impl<S, const D: usize> Ray<S, D> {
 }
 
 impl<S: SimdComplexField, const D: usize> Ray<S, D> {
-
     #[inline]
     #[must_use]
     pub fn new(origin: impl Into<SVector<S, D>>, dir: impl Into<SVector<S, D>>) -> Self {
@@ -92,6 +91,7 @@ pub struct SimulationCtx<S: ComplexField, const D: usize> {
 
 impl<S: ComplexField, const D: usize> SimulationCtx<S, D> {
     #[inline]
+    #[must_use]
     const fn new(ray: Ray<S, D>, eps: S::RealField) -> Self {
         Self { ray, closest: None, eps }
     }
@@ -101,6 +101,7 @@ impl<S: ComplexField, const D: usize> SimulationCtx<S, D> {
     pub const fn ray(&self) -> &Ray<S, D> {
         &self.ray
     }
+
     /// # Panics
     ///
     /// if `tangent` is parallel to `self.ray()`.
@@ -112,9 +113,7 @@ impl<S: ComplexField, const D: usize> SimulationCtx<S, D> {
 
         let d = w.clone().real();
 
-        d.clone().imaginary();
-
-        if &d >= &self.eps && self.closest.as_ref().map_or(true, |(t, _)| t.clone().real() > d) {
+        if d >= self.eps && self.closest.as_ref().map_or(true, |(t, _)| t.clone().real() > d) {
             self.closest = Some((w, tangent.direction));
         }
     }
@@ -320,6 +319,7 @@ impl<S: SimdComplexField, const D: usize> HyperPlane<S, D> {
     #[must_use]
     pub fn reflect(&self, v: &SVector<S, D>) -> SVector<S, D> {
 
+        #[inline]
         fn two<S: Clone + Add<Output = S>>(s: S) -> S {
             s.clone() + s
         }
@@ -446,7 +446,7 @@ pub trait Mirror<const D: usize> {
 
 use impl_trait_for_tuples::*;
 
-#[impl_for_tuples(1, 32)]
+#[impl_for_tuples(1, 16)]
 impl<S: ComplexField, const D: usize> Mirror<D> for Tuple {
     type Scalar = S;
     for_tuples!( where #( Tuple: Mirror<D, Scalar = S> )* );

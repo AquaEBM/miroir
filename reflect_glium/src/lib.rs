@@ -11,7 +11,7 @@ pub use glium_shapes as gl_shapes;
 
 use cgmath as cg;
 use gl::glutin;
-use nalgebra::{self as na, ComplexField, SVector};
+use nalgebra::{self as na, ComplexField, SVector, SimdComplexField, Unit};
 use reflect::*;
 
 mod app;
@@ -84,13 +84,65 @@ impl<const D: usize> From<na::SVector<f64, D>> for Vertex<D> {
     }
 }
 
+pub struct SimulationRay<S, const D: usize> {
+    pub ray: Ray<S, D>,
+    reflection_cap: Option<usize>,
+}
+
+impl<S, const D: usize> SimulationRay<S, D> {
+    #[inline]
+    #[must_use]
+    pub fn new_unit_dir(origin: impl Into<SVector<S, D>>, dir: Unit<SVector<S, D>>) -> Self {
+        Self {
+            ray: Ray::new_unit_dir(origin, dir),
+            reflection_cap: None,
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn new_unchecked_dir(
+        origin: impl Into<SVector<S, D>>,
+        dir: impl Into<SVector<S, D>>,
+    ) -> Self {
+        Self {
+            ray: Ray::new_unchecked_dir(origin, dir),
+            reflection_cap: None,
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn max_reflections(&self) -> Option<&usize> {
+        self.reflection_cap.as_ref()
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn with_reflection_cap(mut self, max: usize) -> Self {
+        self.reflection_cap = Some(max);
+        self
+    }
+}
+
+impl<S: SimdComplexField, const D: usize> SimulationRay<S, D> {
+    #[inline]
+    #[must_use]
+    pub fn new(origin: impl Into<SVector<S, D>>, dir: impl Into<SVector<S, D>>) -> Self {
+        Self {
+            ray: Ray::new(origin, dir),
+            reflection_cap: None,
+        }
+    }
+}
+
 pub fn run_simulation<const D: usize, M, R>(
     mirror: &M,
     rays: R,
     default_eps: <M::Scalar as ComplexField>::RealField,
 ) where
     M: Mirror<D> + OpenGLRenderable + ?Sized,
-    R: IntoIterator<Item = (Ray<M::Scalar, D>, Option<usize>)>,
+    R: IntoIterator<Item = SimulationRay<M::Scalar, D>>,
     Vertex<D>: gl::Vertex,
     Vertex<D>: From<SVector<M::Scalar, D>>,
 {

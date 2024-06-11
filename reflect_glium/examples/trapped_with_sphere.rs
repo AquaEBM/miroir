@@ -1,4 +1,5 @@
-use reflect::{Float, Ray};
+use reflect::Float;
+use reflect_glium::SimulationRay;
 use reflect_mirrors::{Sphere, Triangle};
 
 fn main() {
@@ -15,25 +16,25 @@ fn main() {
             // faces of the cube, use two triangles to form a square
             Triangle::new([[ 5.,  5.,  5.], [ 5., -5.,  5.], [ 5.,  5., -5.]]),
             Triangle::new([[ 5., -5., -5.], [ 5., -5.,  5.], [ 5.,  5., -5.]]),
-            
+
             Triangle::new([[-5.,  5.,  5.], [-5., -5.,  5.], [-5.,  5., -5.]]),
             Triangle::new([[-5., -5., -5.], [-5., -5.,  5.], [-5.,  5., -5.]]),
-            
+
             Triangle::new([[ 5.,  5.,  5.], [-5.,  5.,  5.], [ 5.,  5., -5.]]),
             Triangle::new([[-5.,  5., -5.], [-5.,  5.,  5.], [ 5.,  5., -5.]]),
-            
+
             Triangle::new([[ 5., -5.,  5.], [-5., -5.,  5.], [ 5., -5., -5.]]),
             Triangle::new([[-5., -5., -5.], [-5., -5.,  5.], [ 5., -5., -5.]]),
-            
+
             Triangle::new([[ 5.,  5.,  5.], [ 5., -5.,  5.], [-5.,  5.,  5.]]),
             Triangle::new([[-5., -5.,  5.], [ 5., -5.,  5.], [-5.,  5.,  5.]]),
-            
+
             Triangle::new([[ 5.,  5., -5.], [ 5., -5., -5.], [-5.,  5., -5.]]),
             Triangle::new([[-5., -5., -5.], [ 5., -5., -5.], [-5.,  5., -5.]]),
         ],
     );
 
-    let rays = [(Ray::new([4., 3., 0.1], [-1., -1., 0.]), Some(max))];
+    let rays = [SimulationRay::new([4., 3., 0.1], [-1., -1., 0.]).with_reflection_cap(max)];
 
     reflect_glium::run_simulation(&mirrors, rays, Float::EPSILON * 64.);
 }

@@ -102,7 +102,7 @@ where
     ) -> Self
     where
         M: Mirror<D> + OpenGLRenderable + ?Sized,
-        R: IntoIterator<Item = (Ray<M::Scalar, D>, Option<usize>)>,
+        R: IntoIterator<Item = SimulationRay<M::Scalar, D>>,
         Vertex<D>: From<SVector<M::Scalar, D>>,
     {
         let vertex_shader_src = if D == 2 {
@@ -136,58 +136,64 @@ where
         let mut ray_origins = vec![];
         let mut ray_paths: Vec<_> = rays
             .into_iter()
-            .map(|(ray, reflection_cap)| {
-                let origin = ray.origin.clone();
+            .map(
+                |SimulationRay {
+                     ray,
+                     reflection_cap,
+                 }| {
+                    let origin = ray.origin.clone();
 
-                ray_origins.push(Vertex::from(origin.clone()));
+                    ray_origins.push(Vertex::from(origin.clone()));
 
-                vertex_scratch.clear();
-                point_scratch.clear();
-                point_scratch.push(origin);
+                    vertex_scratch.clear();
+                    point_scratch.clear();
+                    point_scratch.push(origin);
 
-                let mut path = RayPath::new(mirror, ray, eps.clone());
+                    let mut path = RayPath::new(mirror, ray, eps.clone());
 
-                let path_iter = path.by_ref();
+                    let path_iter = path.by_ref();
 
-                let causes_loop = |point: SVector<_, D>| {
-                    let out = loop_index(&point_scratch, &point, eps.clone());
-                    if out.is_none() {
-                        point_scratch.push(point);
+                    let causes_loop = |point: SVector<_, D>| {
+                        let out = loop_index(&point_scratch, &point, eps.clone());
+                        if out.is_none() {
+                            point_scratch.push(point);
+                        }
+                        out
+                    };
+
+                    let outcome = if let Some(n) = reflection_cap {
+                        let loop_idx = path_iter.take(n).find_map(causes_loop);
+
+                        loop_idx
+                            .is_some()
+                            .then_some(loop_idx)
+                            .or_else(|| (point_scratch.len() <= n).then_some(None))
+                    } else {
+                        Some(path_iter.find_map(causes_loop))
+                    };
+
+                    let loop_path = if let Some(Some(loop_index)) = outcome {
+                        vertex_scratch.extend(point_scratch.drain(loop_index..).map(Vertex::from));
+                        gl::VertexBuffer::immutable(display, &vertex_scratch).unwrap()
+                    } else {
+                        gl::VertexBuffer::empty_immutable(display, 0).unwrap()
+                    };
+
+                    vertex_scratch.clear();
+                    vertex_scratch.extend(point_scratch.drain(..).map(Vertex::from));
+
+                    if let Some(None) = outcome {
+                        let last = *vertex_scratch.last().unwrap();
+                        let dir = Vertex::from(path.current_ray().dir.clone().into_inner());
+                        vertex_scratch.push(last + 20000. * dir);
                     }
-                    out
-                };
 
-                let outcome = if let Some(n) = reflection_cap {
-                    let loop_idx = path_iter.take(n).find_map(causes_loop);
+                    let non_loop_path =
+                        gl::VertexBuffer::immutable(display, &vertex_scratch).unwrap();
 
-                    loop_idx
-                        .is_some()
-                        .then_some(loop_idx)
-                        .or_else(|| (point_scratch.len() <= n).then_some(None))
-                } else {
-                    Some(path_iter.find_map(causes_loop))
-                };
-
-                let loop_path = if let Some(Some(loop_index)) = outcome {
-                    vertex_scratch.extend(point_scratch.drain(loop_index..).map(Vertex::from));
-                    gl::VertexBuffer::immutable(display, &vertex_scratch).unwrap()
-                } else {
-                    gl::VertexBuffer::empty_immutable(display, 0).unwrap()
-                };
-
-                vertex_scratch.clear();
-                vertex_scratch.extend(point_scratch.drain(..).map(Vertex::from));
-
-                if let Some(None) = outcome {
-                    let last = *vertex_scratch.last().unwrap();
-                    let dir = Vertex::from(path.current_ray().dir.clone().into_inner());
-                    vertex_scratch.push(last + 20000. * dir);
-                }
-
-                let non_loop_path = gl::VertexBuffer::immutable(display, &vertex_scratch).unwrap();
-
-                (non_loop_path, loop_path)
-            })
+                    (non_loop_path, loop_path)
+                },
+            )
             .collect();
 
         mirrors.shrink_to_fit();

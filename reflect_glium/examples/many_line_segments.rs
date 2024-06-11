@@ -1,4 +1,5 @@
-use reflect::{Float, Ray};
+use reflect::Float;
+use reflect_glium::SimulationRay;
 use reflect_mirrors::LineSegment;
 
 fn main() {
@@ -43,7 +44,7 @@ fn main() {
         LineSegment::new([[10.455, 1.74], [7.395, 1.62]]),
     ];
 
-    let rays = [(Ray::new([9., 5.], [1., 2.]), None)];
+    let rays = [SimulationRay::new([9., 5.], [1., 2.])];
 
     reflect_glium::run_simulation(&mirrors, rays, Float::EPSILON * 64.)
 }

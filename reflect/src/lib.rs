@@ -5,12 +5,12 @@ extern crate alloc;
 use alloc::{boxed::Box, rc::Rc, sync::Arc, vec::Vec};
 use core::{
     fmt::Debug,
-    ops::{Add, Deref},
+    ops::{Add, Deref, Sub},
 };
 
 pub use nalgebra;
 
-use nalgebra::{ComplexField, SMatrix, SVector, SimdComplexField, Unit};
+use nalgebra::{ClosedSub, ComplexField, Normed, SMatrix, SVector, SimdComplexField, Unit};
 
 pub type Float = f64;
 
@@ -578,11 +578,11 @@ impl<'a, const D: usize, M: Mirror<D> + ?Sized> Iterator for RayPath<'a, D, M> {
 
 #[inline]
 #[must_use]
-pub fn loop_index<const D: usize>(
-    path: &[SVector<Float, D>],
-    pt: SVector<Float, D>,
-    e: Float,
-) -> Option<usize> {
+pub fn loop_index<'a, S: Normed>(path: &'a [S], pt: &'a S, e: S::Norm) -> Option<usize>
+where
+    &'a S: Sub<Output = S>,
+    S::Norm: PartialOrd + ClosedSub,
+{
     path.split_last().and_then(|(last_pt, points)| {
         points.windows(2).enumerate().find_map(|(i, window)| {
             // ugly, but `slice::array_windows` is unstable

@@ -1,4 +1,7 @@
-use core::ops::Deref;
+use core::{
+    array,
+    ops::{Add, Deref, Mul},
+};
 extern crate alloc;
 use alloc::{boxed::Box, collections::TryReserveError, rc::Rc, sync::Arc, vec::Vec};
 use std::time;
@@ -22,31 +25,61 @@ use camera::{Camera, CameraController, Projection};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Vertex<const N: usize> {
-    pub position: [f32; N],
+    pub pos: [f32; N],
 }
 
 impl<const D: usize> Default for Vertex<D> {
     fn default() -> Self {
-        Self { position: [0.; D] }
+        Self { pos: [0.; D] }
+    }
+}
+
+impl<const D: usize> Add for Vertex<D> {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            pos: array::from_fn(|i| self.pos[i] + rhs.pos[i]),
+        }
+    }
+}
+
+impl<const D: usize> Mul<f32> for Vertex<D> {
+    type Output = Self;
+
+    fn mul(self, s: f32) -> Self::Output {
+        Self {
+            pos: self.pos.map(|c| c * s),
+        }
+    }
+}
+
+impl<const D: usize> Mul<Vertex<D>> for f32 {
+    type Output = Vertex<D>;
+
+    fn mul(self, rhs: Vertex<D>) -> Self::Output {
+        Vertex {
+            pos: rhs.pos.map(|c| c * self),
+        }
     }
 }
 
 pub type Vertex2D = Vertex<2>;
-gl::implement_vertex!(Vertex2D, position);
+gl::implement_vertex!(Vertex2D, pos);
 
 pub type Vertex3D = Vertex<3>;
-gl::implement_vertex!(Vertex3D, position);
+gl::implement_vertex!(Vertex3D, pos);
 
 impl<const D: usize> From<na::SVector<f32, D>> for Vertex<D> {
     fn from(v: na::SVector<f32, D>) -> Self {
-        Self { position: v.into() }
+        Self { pos: v.into() }
     }
 }
 
 impl<const D: usize> From<na::SVector<f64, D>> for Vertex<D> {
     fn from(v: na::SVector<f64, D>) -> Self {
         Self {
-            position: v.map(|s| s as f32).into(),
+            pos: v.map(|s| s as f32).into(),
         }
     }
 }

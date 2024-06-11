@@ -6,7 +6,7 @@ const LINE_STRIP: NoIndices = NoIndices(PrimitiveType::LineStrip);
 
 pub struct App<const D: usize> {
     ray_origins: gl::VertexBuffer<Vertex<D>>,
-    ray_paths: Vec<gl::VertexBuffer<Vertex<D>>>,
+    ray_paths: Vec<(gl::VertexBuffer<Vertex<D>>, gl::VertexBuffer<Vertex<D>>)>,
     mirrors: Vec<Box<dyn RenderData>>,
     program: gl::Program,
     starting_pts_program: gl::Program,
@@ -66,6 +66,30 @@ const STARTING_POINT_GEOMETRY_SHADER_SRC: &str = r"
     }
 ";
 
+const VERTEX_SHADER_2D_SRC: &str = r"
+    #version 140
+
+    in vec2 pos;
+    uniform mat4 perspective;
+    uniform mat4 view;
+
+    void main() {
+        gl_Position = perspective * view * vec4(pos, 0.0, 1.0);
+    }
+";
+
+const VERTEX_SHADER_3D_SRC: &str = r"
+    #version 140
+
+    in vec3 pos;
+    uniform mat4 perspective;
+    uniform mat4 view;
+
+    void main() {
+        gl_Position = perspective * view * vec4(pos, 1.0);
+    }
+";
+
 impl<const D: usize> App<D>
 where
     Vertex<D>: gl::Vertex,
@@ -81,40 +105,21 @@ where
         R: IntoIterator<Item = (Ray<M::Scalar, D>, Option<usize>)>,
         Vertex<D>: From<SVector<M::Scalar, D>>,
     {
-        let vertex_shader = if D == 2 {
-            r"
-            #version 140
-
-            in vec2 position;
-            uniform mat4 perspective;
-            uniform mat4 view;
-
-            void main() {
-                gl_Position = perspective * view * vec4(position, 0.0, 1.0);
-            }
-        "
+        let vertex_shader_src = if D == 2 {
+            VERTEX_SHADER_2D_SRC
         } else if D == 3 {
-            r"
-            #version 140
-
-            in vec3 position;
-            uniform mat4 perspective;
-            uniform mat4 view;
-
-            void main() {
-                gl_Position = perspective * view * vec4(position, 1.0);
-            }
-        "
+            VERTEX_SHADER_3D_SRC
         } else {
             unreachable!()
         };
 
         let program =
-            gl::Program::from_source(display, vertex_shader, FRAGMENT_SHADER_SRC, None).unwrap();
+            gl::Program::from_source(display, vertex_shader_src, FRAGMENT_SHADER_SRC, None)
+                .unwrap();
 
         let starting_pts_program = gl::Program::from_source(
             display,
-            vertex_shader,
+            vertex_shader_src,
             FRAGMENT_SHADER_SRC,
             Some(STARTING_POINT_GEOMETRY_SHADER_SRC),
         )
@@ -124,36 +129,70 @@ where
 
         mirror.append_render_data(display, &mut mirrors);
 
-        let mut mirrors = mirrors.into_inner();
-
-        mirrors.shrink_to_fit();
-
         let mut vertex_scratch = vec![];
-        let mut ray_origins = vec![];
+        let mut point_scratch = vec![];
 
+        let mut mirrors = mirrors.into_inner();
+        let mut ray_origins = vec![];
         let mut ray_paths: Vec<_> = rays
             .into_iter()
-            .map(|(ray, max_reflections)| {
-                let origin = ray.origin.clone().into();
+            .map(|(ray, reflection_cap)| {
+                let origin = ray.origin.clone();
 
-                ray_origins.push(origin);
+                ray_origins.push(Vertex::from(origin.clone()));
 
                 vertex_scratch.clear();
-                vertex_scratch.push(origin);
+                point_scratch.clear();
+                point_scratch.push(origin);
 
-                let path = RayPath::new(mirror, ray, eps.clone()).map(Vertex::from);
+                let mut path = RayPath::new(mirror, ray, eps.clone());
 
-                if let Some(n) = max_reflections {
-                    vertex_scratch.extend(path.take(n));
+                let path_iter = path.by_ref();
+
+                let causes_loop = |point: SVector<_, D>| {
+                    let out = loop_index(&point_scratch, &point, eps.clone());
+                    if out.is_none() {
+                        point_scratch.push(point);
+                    }
+                    out
+                };
+
+                let outcome = if let Some(n) = reflection_cap {
+                    let loop_idx = path_iter.take(n).find_map(causes_loop);
+
+                    loop_idx
+                        .is_some()
+                        .then_some(loop_idx)
+                        .or_else(|| (point_scratch.len() <= n).then_some(None))
                 } else {
-                    vertex_scratch.extend(path);
+                    Some(path_iter.find_map(causes_loop))
+                };
+
+                let loop_path = if let Some(Some(loop_index)) = outcome {
+                    vertex_scratch.extend(point_scratch.drain(loop_index..).map(Vertex::from));
+                    gl::VertexBuffer::immutable(display, &vertex_scratch).unwrap()
+                } else {
+                    gl::VertexBuffer::empty_immutable(display, 0).unwrap()
+                };
+
+                vertex_scratch.clear();
+                vertex_scratch.extend(point_scratch.drain(..).map(Vertex::from));
+
+                if let Some(None) = outcome {
+                    let last = *vertex_scratch.last().unwrap();
+                    let dir = Vertex::from(path.current_ray().dir.clone().into_inner());
+                    vertex_scratch.push(last + 20000. * dir);
                 }
 
-                gl::VertexBuffer::immutable(display, &vertex_scratch).unwrap()
+                let non_loop_path = gl::VertexBuffer::immutable(display, &vertex_scratch).unwrap();
+
+                (non_loop_path, loop_path)
             })
             .collect();
 
+        mirrors.shrink_to_fit();
         ray_paths.shrink_to_fit();
+        ray_origins.shrink_to_fit();
 
         Self {
             ray_origins: gl::VertexBuffer::immutable(display, &ray_origins).unwrap(),
@@ -280,6 +319,7 @@ where
     }
 
     fn render_3d(&self, display: &gl::Display, camera: &Camera, projection: &Projection) {
+        const RAY_LOOP_COL: [f32; 4] = [0.9, 0.2, 0.9, 1.0];
         const RAY_NON_LOOP_COL: [f32; 4] = [0.7, 0.7, 0.7, 0.9];
         let mirror_color = if D == 3 {
             [0.05f32, 0.2, 0.2, 0.4]
@@ -294,8 +334,8 @@ where
         use gl::Surface;
         target.clear_color_and_depth((0.01, 0.01, 0.05, 1.), 1.0);
 
-        let perspective: [[f32; 4]; 4] = projection.get_matrix().into();
-        let view: [[f32; 4]; 4] = camera.calc_matrix().into();
+        let perspective: [[_; 4]; 4] = projection.get_matrix().into();
+        let view: [[_; 4]; 4] = camera.calc_matrix().into();
 
         let aspect = projection.aspect();
 
@@ -304,16 +344,30 @@ where
             ..Default::default()
         };
 
-        for ray in &self.ray_paths {
+        for (non_loop_path, loop_path) in &self.ray_paths {
             target
                 .draw(
-                    ray,
+                    non_loop_path,
                     LINE_STRIP,
                     &self.program,
                     &gl::uniform! {
                         perspective: perspective,
                         view: view,
                         color_vec: RAY_NON_LOOP_COL,
+                    },
+                    &params,
+                )
+                .unwrap();
+
+            target
+                .draw(
+                    loop_path,
+                    LINE_STRIP,
+                    &self.program,
+                    &gl::uniform! {
+                        perspective: perspective,
+                        view: view,
+                        color_vec: RAY_LOOP_COL,
                     },
                     &params,
                 )
@@ -344,6 +398,7 @@ where
                 &gl::uniform! {
                     perspective: perspective,
                     view: view,
+                    // red
                     color_vec: [1.0f32, 0.0, 0.0, 1.0],
                     aspect: aspect,
                 },

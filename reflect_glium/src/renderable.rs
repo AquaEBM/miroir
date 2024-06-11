@@ -14,11 +14,7 @@ pub trait RenderData {
 }
 
 // glium_shapes 3d convenience blanket impl
-impl<T> RenderData for T
-where
-    for<'a> &'a T: Into<gl::vertex::VerticesSource<'a>>,
-    for<'a> &'a T: Into<gl::index::IndicesSource<'a>>,
-{
+impl RenderData for glium_shapes::sphere::Sphere {
     fn vertices(&self) -> gl::vertex::VerticesSource {
         self.into()
     }

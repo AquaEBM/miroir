@@ -263,7 +263,7 @@ impl RenderData for CylinderRenderData {
     }
 }
 
-impl OpenGLRenderable for reflect_mirrors::Cylinder {
+impl OpenGLRenderable for reflect_mirrors::Cylinder<Float> {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         const NUM_POINTS: usize = 360;
 
@@ -278,12 +278,13 @@ impl OpenGLRenderable for reflect_mirrors::Cylinder {
         // to a unit vector `b`, let `v = a + b`, and vT be the transpose of v, also,
         // let `O = (v * vT) / (vT * v), or v ⊗ v / <v, v>` (outer product over inner product)
         // Then, `R = 2 * O - Id`
+        // TODO: use `nalgebra::Rotation`
         let id = nalgebra::SMatrix::identity();
         let o = nalgebra::SMatrix::from_fn(|i, j| v[i] * v[j]);
         let rot = 2.0 / v.norm_squared() * o - id;
 
         let r = *self.radius() as f32;
-        let start = self.line_segment()[0].map(|s| s as f32);
+        let start = self.start().map(|s| s as f32);
 
         use core::f32::consts::TAU;
 

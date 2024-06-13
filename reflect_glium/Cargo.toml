@@ -1,13 +1,20 @@
 [package]
+
 name = "reflect_glium"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 
-glium = "0.32"
-glium_shapes = { git = "https://github.com/FlashOnFire/glium_shapes.git", branch = "glium-0.32.2" }
 reflect = { path = "../reflect" }
-cgmath = "0.18"
-impl-trait-for-tuples = "0.2"
 reflect_mirrors = { path = "../reflect_mirrors" }
+
+glium = "0.32"
+
+impl-trait-for-tuples = "0.2"
+num-traits = "0.2"
+
+# TODO: work on getting rid of these
+
+glium_shapes = { git = "https://github.com/FlashOnFire/glium_shapes.git", branch = "glium-0.32.2" }
+cgmath = "0.18"

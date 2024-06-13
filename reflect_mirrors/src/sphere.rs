@@ -14,6 +14,7 @@ pub struct Sphere<S: ComplexField, const D: usize> {
 
 impl<S: ComplexField, const D: usize> Sphere<S, D> {
     #[inline]
+    #[must_use]
     pub fn new(center: impl Into<SVector<S, D>>, radius: impl Into<S::RealField>) -> Self {
         let radius = radius.into();
         Self {
@@ -23,15 +24,21 @@ impl<S: ComplexField, const D: usize> Sphere<S, D> {
         }
     }
 
+    #[inline]
+    #[must_use]
     pub fn radius(&self) -> &S::RealField {
         &self.radius
     }
 
+    #[inline]
+    #[must_use]
     pub fn set_radius(&mut self, r: S::RealField) {
         self.radius = r.clone().abs();
         self.radius_sq = r.clone() * r;
     }
 
+    #[inline]
+    #[must_use]
     pub fn intersections(&self, ray: &Ray<S, D>) -> Option<[S; 2]> {
         // substituting `V` for `P + t * D` in the sphere equation:
         // `||V - C||^2 = r^2` results in a quadratic equation in `t`.
@@ -51,6 +58,8 @@ impl<S: ComplexField, const D: usize> Sphere<S, D> {
     }
 
     #[rustfmt::skip]
+    #[inline]
+    #[must_use]
     pub fn tangents_at_intersections(
         &self,
         ray: &Ray<S, D>,
@@ -66,8 +75,8 @@ impl<S: ComplexField, const D: usize> Sphere<S, D> {
 
 impl<S: ComplexField, const D: usize> Mirror<D> for Sphere<S, D> {
     type Scalar = S;
-    fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, D>) {
-        if let Some(tangents) = self.tangents_at_intersections(ctx.ray()) {
+    fn add_tangents(&self, ctx: &SimulationCtx<Self::Scalar, D>) {
+        if let Some(tangents) = self.tangents_at_intersections(ctx.ray) {
             for (d, n) in tangents {
                 ctx.add_tangent(Plane {
                     intersection: Intersection::Distance(d),

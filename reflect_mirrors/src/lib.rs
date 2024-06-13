@@ -1,3 +1,5 @@
+#![no_std]
+
 mod cylinder;
 mod simplex;
 mod sphere;

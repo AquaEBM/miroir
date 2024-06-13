@@ -65,16 +65,14 @@ impl<S: SimdComplexField, const D: usize> Simplex<S, D> {
     }
 }
 
-impl<S: RealField, const D: usize> Mirror<D> for Simplex<S, D> {
-    type Scalar = S;
-    fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, D>) {
+impl<S: RealField, const D: usize> Simplex<S, D> {
+    #[inline]
+    pub fn intersection(&self, ray: &Ray<S, D>) -> Option<S> {
         let p = self.inner_plane();
-
-        let ray = ctx.ray();
 
         let intersection_coords = p.intersection_coordinates(ray, p.v0());
 
-        if let Some(t) = intersection_coords.as_ref().and_then(|v| {
+        intersection_coords.as_ref().and_then(|v| {
             let (distance, plane_coords) = v.as_slice().split_first().unwrap();
             let mut sum = S::zero();
             for coord in plane_coords {
@@ -88,13 +86,29 @@ impl<S: RealField, const D: usize> Mirror<D> for Simplex<S, D> {
                 return None;
             }
 
-            Some(distance)
-        }) {
+            Some(distance.clone())
+        })
+    }
+
+    #[inline]
+    pub fn tangent_at_intersection(
+        &self,
+        ray: &Ray<S, D>,
+    ) -> Option<(S, &HyperPlaneBasisOrtho<S, D>)> {
+        self.intersection(ray).map(|t| (t, &self.orthonormalised))
+    }
+}
+
+impl<S: RealField, const D: usize> Mirror<D> for Simplex<S, D> {
+    type Scalar = S;
+    fn add_tangents(&self, ctx: &SimulationCtx<Self::Scalar, D>) {
+        if let Some((t, direction)) = self.tangent_at_intersection(ctx.ray) {
             ctx.add_tangent(Plane {
-                // We could return `self.plane.v0()`, but since we already calculated `t`,
-                // we might as well save the simulation runner some work, and return that
-                intersection: Intersection::Distance(t.clone()),
-                direction: HyperPlane::Plane(self.orthonormalised.clone()),
+                // We could return `Intersection::StartingPoint(self.plane.v0())`, but
+                // we already calculated `t`.
+                // We might as well save the simulation runner some work, and return that
+                intersection: Intersection::Distance(t),
+                direction: HyperPlane::Plane(direction.clone()),
             });
         }
     }

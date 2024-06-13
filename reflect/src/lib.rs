@@ -4,7 +4,9 @@ extern crate alloc;
 
 use alloc::{boxed::Box, rc::Rc, sync::Arc, vec::Vec};
 use core::{
+    cell::Cell,
     fmt::Debug,
+    mem,
     ops::{Add, Deref, Sub},
 };
 
@@ -88,48 +90,52 @@ impl<S: SimdComplexField, const D: usize> Ray<S, D> {
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
-pub struct SimulationCtx<S: ComplexField, const D: usize> {
-    pub(crate) ray: Ray<S, D>,
-    pub(crate) closest: Option<(S, HyperPlane<S, D>)>,
+pub struct SimulationCtx<'a, S: ComplexField, const D: usize> {
+    pub ray: &'a Ray<S, D>,
+    pub(crate) closest: Cell<Option<(S, HyperPlane<S, D>)>>,
     pub(crate) eps: S::RealField,
 }
 
-impl<S: ComplexField, const D: usize> SimulationCtx<S, D> {
+impl<'a, S: ComplexField, const D: usize> SimulationCtx<'a, S, D> {
     #[inline]
     #[must_use]
-    const fn new(ray: Ray<S, D>, eps: S::RealField) -> Self {
+    pub const fn new(ray: &'a Ray<S, D>, tolerance_eps: S::RealField) -> Self {
         Self {
             ray,
-            closest: None,
-            eps,
+            closest: Cell::new(None),
+            eps: tolerance_eps,
         }
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn ray(&self) -> &Ray<S, D> {
-        &self.ray
     }
 
     /// # Panics
     ///
-    /// if `tangent` is parallel to `self.ray()`.
-    pub fn add_tangent(&mut self, tangent: Plane<S, D>) {
+    /// if `tangent` is parallel to `self.ray`.
+    pub fn add_tangent(&self, tangent: Plane<S, D>) {
         let w = tangent
-            .try_ray_intersection(self.ray())
+            .try_ray_intersection(self.ray)
             .expect("a mirror returned a plane parallel to the ray: aborting");
 
         let d = w.clone().real();
 
-        if d >= self.eps
-            && self
-                .closest
-                .as_ref()
-                .map_or(true, |(t, _)| t.clone().real() > d)
-        {
-            self.closest = Some((w, tangent.direction));
-        }
+        let closest = self.closest.take();
+
+        self.closest.set(
+            if d >= self.eps && closest.as_ref().map_or(true, |(t, _)| t.clone().real() > d) {
+                Some((w, tangent.direction))
+            } else {
+                closest
+            },
+        );
+    }
+
+    #[inline]
+    pub fn into_closest(self) -> Option<(S, HyperPlane<S, D>)> {
+        self.closest.take()
+    }
+
+    #[inline]
+    pub fn reset_closest(&mut self) -> Option<(S, HyperPlane<S, D>)> {
+        mem::take(self.closest.get_mut())
     }
 }
 
@@ -431,38 +437,32 @@ impl<S: ComplexField, const D: usize> Plane<S, D> {
 /// `#[feature(generic_const_exprs)]` makes this difficult
 pub trait Mirror<const D: usize> {
     type Scalar: ComplexField;
-    /// Adds the tangents to this mirror, at the
-    /// points of intersection between it and the `ray`, in no particular order.
+    /// Adds the tangents to this mirror, at the points of intersection
+    /// between it and the `ray`, in no particular order.
     ///
     /// Tangents can be added with [`ctx.add_tangent(...)`](SimulationCtx::add_tangent).
     ///
-    /// The `ray` can be accessed through [`ctx.ray( )`](SimulationCtx::ray).
+    /// The `ray` can be accessed through [`ctx.ray`](SimulationCtx::ray).
     ///
-    /// The ray is expected to "bounce" off the plane closest to it.
+    /// Adds nothing if the ray doesn't intersect with the set that `self` represents.
     ///
-    /// Here, "bounce" refers to the process of:
-    ///     - Moving forward to the intersection.
-    ///     - Then, orthogonally reflecting it's direction vector with
-    ///       respect to the direction hyperplane.
-    ///
-    /// Adds nothing if the ray doesn't intersect with the mirror that `self` represents.
-    ///
-    /// This method may push intersection points that occur "behind" the ray's
-    /// origin, (`ray.at(t)` where `t < 0.0`) simulations must discard these accordingly.
+    /// This method may register tangents intersecting with the ray at "negative" `t` values,
+    /// making them "behind" the ray's origin, (`ray.at(t)` where `t < 0.0`), these will be
+    /// properly discarded.
     ///
     /// This method is deterministic, i. e. not random: for some `ray`, it always has
     /// the same behavior for that `ray`, regardless of other circumstances/external state.
-    fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, D>);
+    fn add_tangents(&self, ctx: &SimulationCtx<Self::Scalar, D>);
 }
 
 use impl_trait_for_tuples::*;
 
 #[impl_for_tuples(1, 16)]
 impl<S: ComplexField, const D: usize> Mirror<D> for Tuple {
-    type Scalar = S;
     for_tuples!( where #( Tuple: Mirror<D, Scalar = S> )* );
+    type Scalar = S;
 
-    fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, D>) {
+    fn add_tangents(&self, ctx: &SimulationCtx<Self::Scalar, D>) {
         for_tuples!( #( Tuple.add_tangents(ctx); )* );
     }
 }
@@ -470,7 +470,7 @@ impl<S: ComplexField, const D: usize> Mirror<D> for Tuple {
 impl<const D: usize, T: Mirror<D>> Mirror<D> for [T] {
     type Scalar = T::Scalar;
     #[inline]
-    fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, D>) {
+    fn add_tangents(&self, ctx: &SimulationCtx<Self::Scalar, D>) {
         self.iter().for_each(|mirror| mirror.add_tangents(ctx));
     }
 }
@@ -478,7 +478,7 @@ impl<const D: usize, T: Mirror<D>> Mirror<D> for [T] {
 impl<const N: usize, const D: usize, T: Mirror<D>> Mirror<D> for [T; N] {
     type Scalar = T::Scalar;
     #[inline]
-    fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, D>) {
+    fn add_tangents(&self, ctx: &SimulationCtx<Self::Scalar, D>) {
         self.as_slice().add_tangents(ctx);
     }
 }
@@ -489,7 +489,7 @@ impl<const N: usize, const D: usize, T: Mirror<D>> Mirror<D> for [T; N] {
 impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Box<T> {
     type Scalar = T::Scalar;
     #[inline]
-    fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, D>) {
+    fn add_tangents(&self, ctx: &SimulationCtx<Self::Scalar, D>) {
         self.deref().add_tangents(ctx);
     }
 }
@@ -497,7 +497,7 @@ impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Box<T> {
 impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Arc<T> {
     type Scalar = T::Scalar;
     #[inline]
-    fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, D>) {
+    fn add_tangents(&self, ctx: &SimulationCtx<Self::Scalar, D>) {
         self.deref().add_tangents(ctx);
     }
 }
@@ -505,7 +505,7 @@ impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Arc<T> {
 impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Rc<T> {
     type Scalar = T::Scalar;
     #[inline]
-    fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, D>) {
+    fn add_tangents(&self, ctx: &SimulationCtx<Self::Scalar, D>) {
         self.deref().add_tangents(ctx);
     }
 }
@@ -513,7 +513,7 @@ impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Rc<T> {
 impl<const D: usize, T: Mirror<D>> Mirror<D> for Vec<T> {
     type Scalar = T::Scalar;
     #[inline]
-    fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, D>) {
+    fn add_tangents(&self, ctx: &SimulationCtx<Self::Scalar, D>) {
         self.as_slice().add_tangents(ctx);
     }
 }
@@ -521,7 +521,7 @@ impl<const D: usize, T: Mirror<D>> Mirror<D> for Vec<T> {
 impl<'a, const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for &'a T {
     type Scalar = T::Scalar;
     #[inline]
-    fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, D>) {
+    fn add_tangents(&self, ctx: &SimulationCtx<Self::Scalar, D>) {
         (*self).add_tangents(ctx);
     }
 }
@@ -529,33 +529,38 @@ impl<'a, const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for &'a T {
 impl<'a, const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for &'a mut T {
     type Scalar = T::Scalar;
     #[inline]
-    fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, D>) {
+    fn add_tangents(&self, ctx: &SimulationCtx<Self::Scalar, D>) {
         self.deref().add_tangents(ctx);
     }
 }
 
 pub struct RayPath<'a, const D: usize, M: Mirror<D> + ?Sized> {
-    pub(crate) ctx: SimulationCtx<M::Scalar, D>,
+    pub(crate) ray: Ray<M::Scalar, D>,
+    pub(crate) eps: <M::Scalar as ComplexField>::RealField,
     pub(crate) mirror: &'a M,
 }
 
 impl<'a, const D: usize, M: Mirror<D> + ?Sized> RayPath<'a, D, M> {
     #[inline]
+    #[must_use]
     pub const fn new(
         mirror: &'a M,
         ray: Ray<M::Scalar, D>,
         eps: <M::Scalar as ComplexField>::RealField,
     ) -> Self {
-        Self {
-            ctx: SimulationCtx::new(ray, eps),
-            mirror,
-        }
+        Self { ray, eps, mirror }
     }
 
     #[inline]
     #[must_use]
     pub const fn current_ray(&self) -> &Ray<M::Scalar, D> {
-        self.ctx.ray()
+        &self.ray
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn mirror(&self) -> &M {
+        &self.mirror
     }
 }
 
@@ -564,11 +569,12 @@ impl<'a, const D: usize, M: Mirror<D> + ?Sized> Iterator for RayPath<'a, D, M> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let ctx = &mut self.ctx;
-        self.mirror.add_tangents(ctx);
+        let mut ctx = SimulationCtx::new(&self.ray, self.eps.clone());
+        self.mirror.add_tangents(&mut ctx);
+        let closest = ctx.into_closest();
 
-        let ray = &mut ctx.ray;
-        ctx.closest.take().map(|(dist, direction)| {
+        let ray = &mut self.ray;
+        closest.map(|(dist, direction)| {
             ray.advance(dist);
             ray.reflect_dir(&direction);
             ray.origin.clone()

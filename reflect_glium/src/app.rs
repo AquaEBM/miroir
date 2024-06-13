@@ -368,7 +368,7 @@ where
             target
                 .draw(
                     loop_path,
-                    LINE_STRIP,
+                    NoIndices(PrimitiveType::LineLoop),
                     &self.program,
                     &gl::uniform! {
                         perspective: perspective,

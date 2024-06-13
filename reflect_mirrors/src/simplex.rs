@@ -32,8 +32,8 @@ impl<S: ComplexField, const D: usize> Simplex<S, D> {
     }
 
     #[inline]
-    pub fn new(vectors: [impl Into<SVector<S, D>>; D]) -> Self {
-        Self::try_new(vectors).unwrap()
+    pub fn new(points: [impl Into<SVector<S, D>>; D]) -> Self {
+        Self::try_new(points).unwrap()
     }
 }
 
@@ -51,8 +51,8 @@ where
     type Error = ();
 
     #[inline]
-    fn try_from(vectors: [U; D]) -> Result<Self, Self::Error> {
-        Self::try_new(vectors).ok_or(())
+    fn try_from(points: [U; D]) -> Result<Self, Self::Error> {
+        Self::try_new(points).ok_or(())
     }
 }
 

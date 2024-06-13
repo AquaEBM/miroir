@@ -7,12 +7,12 @@ use core::{
     cell::Cell,
     fmt::Debug,
     mem,
-    ops::{Add, Deref, Sub},
+    ops::{Add, Deref},
 };
 
 pub use nalgebra;
 
-use nalgebra::{ClosedSub, ComplexField, Normed, SMatrix, SVector, SimdComplexField, Unit};
+use nalgebra::{ComplexField, SMatrix, SVector, SimdComplexField, Unit};
 
 pub type Float = f64;
 
@@ -584,19 +584,21 @@ impl<'a, const D: usize, M: Mirror<D> + ?Sized> Iterator for RayPath<'a, D, M> {
 
 #[inline]
 #[must_use]
-pub fn loop_index<'a, S: Normed>(path: &'a [S], pt: &'a S, e: S::Norm) -> Option<usize>
-where
-    &'a S: Sub<Output = S>,
-    S::Norm: PartialOrd + ClosedSub,
-{
+pub fn loop_index<const D: usize, S: ComplexField>(path: &[SVector<S, D>], new_pt: &SVector<S, D>, e: S::RealField) -> Option<usize> {
     path.split_last().and_then(|(last_pt, points)| {
+
+        let current_dir = Unit::new_normalize(new_pt - last_pt).into_inner();
+
         points.windows(2).enumerate().find_map(|(i, window)| {
             // ugly, but `slice::array_windows` is unstable
             let [this_pt, next_pt] = window else {
                 // because window.len() is always 2
                 unreachable!()
             };
-            ((last_pt - this_pt).norm() <= e && (pt - next_pt).norm() < e).then_some(i)
+
+            let impact_dir = Unit::new_normalize(next_pt - this_pt).into_inner();
+
+            ((new_pt - next_pt).norm() <= e && (impact_dir - &current_dir).norm() <= e).then_some(i)
         })
     })
 }

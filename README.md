@@ -33,3 +33,5 @@ The [`reflect_glium`](reflect_glium) binary crate allows viewing simulations whe
 - Click and drag your mouse on the screen to look around, and rotate the camera.
 - Use the right/left arrow key to increase/decrease camera rotation sensitivity.
 - Use the up/down key to increase/decrease movement speed.
+
+Currently, the ray's path is drawn in white, and the portion of the path that loops infinitely (if it exists) is drawn in pink.

@@ -1,4 +1,6 @@
-use nalgebra::{ComplexField, RealField, SimdComplexField};
+use core::ops::AddAssign;
+
+use nalgebra::{ComplexField, RealField};
 
 use super::*;
 
@@ -54,7 +56,10 @@ where
     }
 }
 
-impl<S: SimdComplexField, const D: usize> Simplex<S, D> {
+impl<S, const D: usize> Simplex<S, D>
+where
+    SVector<S, D>: AddAssign + Clone,
+{
     #[inline]
     pub fn vertices(&self) -> [SVector<S, D>; D] {
         let mut vertices = self.inner_plane().vectors_raw().clone();

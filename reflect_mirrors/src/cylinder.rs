@@ -116,7 +116,6 @@ impl<S: RealField> Cylinder<S> {
 impl<S: RealField> Mirror<3> for Cylinder<S> {
     type Scalar = S;
     fn add_tangents(&self, ctx: &SimulationCtx<Self::Scalar, 3>) {
-
         for (d, n) in self.tangents_at_intersections(ctx.ray) {
             ctx.add_tangent(Plane {
                 intersection: Intersection::Distance(d),

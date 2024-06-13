@@ -4,6 +4,7 @@ use core::{
 };
 extern crate alloc;
 use alloc::{boxed::Box, collections::TryReserveError, rc::Rc, sync::Arc, vec::Vec};
+use num_traits::AsPrimitive;
 use std::time;
 
 pub use glium as gl;
@@ -11,7 +12,7 @@ pub use glium_shapes as gl_shapes;
 
 use cgmath as cg;
 use gl::glutin;
-use nalgebra::{self as na, ComplexField, SVector, SimdComplexField, Unit};
+use nalgebra::{self as na, ComplexField, SVector, Scalar, SimdComplexField, Unit};
 use reflect::*;
 
 mod app;
@@ -70,17 +71,12 @@ gl::implement_vertex!(Vertex2D, pos);
 pub type Vertex3D = Vertex<3>;
 gl::implement_vertex!(Vertex3D, pos);
 
-impl<const D: usize> From<na::SVector<f32, D>> for Vertex<D> {
-    fn from(v: na::SVector<f32, D>) -> Self {
-        Self { pos: v.into() }
-    }
-}
-
-impl<const D: usize> From<na::SVector<f64, D>> for Vertex<D> {
-    fn from(v: na::SVector<f64, D>) -> Self {
-        Self {
-            pos: v.map(|s| s as f32).into(),
-        }
+impl<S, const D: usize> From<na::SVector<S, D>> for Vertex<D>
+where
+    S: Scalar + AsPrimitive<f32>,
+{
+    fn from(v: na::SVector<S, D>) -> Self {
+        Self { pos: v.map(AsPrimitive::as_).into() }
     }
 }
 

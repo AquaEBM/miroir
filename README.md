@@ -35,3 +35,11 @@ The [`reflect_glium`](reflect_glium) binary crate allows viewing simulations whe
 - Use the up/down key to increase/decrease movement speed.
 
 Currently, the ray's path is drawn in white, and the portion of the path that loops infinitely (if it exists) is drawn in pink.
+
+Examples of simulations you can run (and how to create them) can be found in the [`reflect_glium/examples`](reflect_glium/examples) directory. Use the following command to run one.
+
+```shell
+cargo run -r -p reflect_glium --example <example_name>
+```
+
+where `<example_name>` is the name of the example's source file (without the trailing `.rs`)

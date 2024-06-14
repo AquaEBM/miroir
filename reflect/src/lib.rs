@@ -93,7 +93,7 @@ impl<S: SimdComplexField, const D: usize> Ray<S, D> {
 pub struct SimulationCtx<'a, S: ComplexField, const D: usize> {
     pub ray: &'a Ray<S, D>,
     pub(crate) closest: Cell<Option<(S, HyperPlane<S, D>)>>,
-    pub(crate) eps: S::RealField,
+    pub epsilon: S::RealField,
 }
 
 impl<'a, S: ComplexField, const D: usize> SimulationCtx<'a, S, D> {
@@ -103,7 +103,7 @@ impl<'a, S: ComplexField, const D: usize> SimulationCtx<'a, S, D> {
         Self {
             ray,
             closest: Cell::new(None),
-            eps: tolerance_eps,
+            epsilon: tolerance_eps,
         }
     }
 
@@ -120,7 +120,7 @@ impl<'a, S: ComplexField, const D: usize> SimulationCtx<'a, S, D> {
         let closest = self.closest.take();
 
         self.closest.set(
-            if d >= self.eps && closest.as_ref().map_or(true, |(t, _)| t.clone().real() > d) {
+            if d >= self.epsilon && closest.as_ref().map_or(true, |(t, _)| t.clone().real() > d) {
                 Some((w, tangent.direction))
             } else {
                 closest
@@ -584,9 +584,12 @@ impl<'a, const D: usize, M: Mirror<D> + ?Sized> Iterator for RayPath<'a, D, M> {
 
 #[inline]
 #[must_use]
-pub fn loop_index<const D: usize, S: ComplexField>(path: &[SVector<S, D>], new_pt: &SVector<S, D>, e: S::RealField) -> Option<usize> {
+pub fn loop_index<const D: usize, S: ComplexField>(
+    path: &[SVector<S, D>],
+    new_pt: &SVector<S, D>,
+    e: S::RealField,
+) -> Option<usize> {
     path.split_last().and_then(|(last_pt, points)| {
-
         let current_dir = Unit::new_normalize(new_pt - last_pt).into_inner();
 
         points.windows(2).enumerate().find_map(|(i, window)| {

@@ -4,7 +4,7 @@ use core::{
 };
 extern crate alloc;
 use alloc::{boxed::Box, collections::TryReserveError, rc::Rc, sync::Arc, vec::Vec};
-use num_traits::AsPrimitive;
+use num_traits::{float::FloatCore, AsPrimitive};
 use std::time;
 
 pub use glium as gl;
@@ -12,17 +12,21 @@ pub use glium_shapes as gl_shapes;
 
 use cgmath as cg;
 use gl::glutin;
-use nalgebra::{self as na, ComplexField, SVector, Scalar, SimdComplexField, Unit};
+
+use gl::backend::glutin::DisplayCreationError;
+
+use glutin::{dpi, event_loop, window};
+use nalgebra::{self as na, RealField, SVector, Scalar, SimdComplexField, Unit};
 use reflect::*;
 
-mod app;
 mod camera;
 mod renderable;
+mod sim_render_data;
 
 pub use renderable::*;
 
-use app::App;
 use camera::{Camera, CameraController, Projection};
+use sim_render_data::SimulationRenderData;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Vertex<const N: usize> {
@@ -76,13 +80,22 @@ where
     S: Scalar + AsPrimitive<f32>,
 {
     fn from(v: na::SVector<S, D>) -> Self {
-        Self { pos: v.map(AsPrimitive::as_).into() }
+        Self {
+            pos: v.map(AsPrimitive::as_).into(),
+        }
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct SimulationRay<S, const D: usize> {
     pub ray: Ray<S, D>,
     reflection_cap: Option<usize>,
+}
+
+impl<const D: usize, S: PartialEq> PartialEq for SimulationRay<S, D> {
+    fn eq(&self, other: &Self) -> bool {
+        self.ray == other.ray && self.reflection_cap == other.reflection_cap
+    }
 }
 
 impl<S, const D: usize> SimulationRay<S, D> {
@@ -132,34 +145,71 @@ impl<S: SimdComplexField, const D: usize> SimulationRay<S, D> {
     }
 }
 
-pub fn run_simulation<const D: usize, M, R>(
-    mirror: &M,
-    rays: R,
-    default_eps: <M::Scalar as ComplexField>::RealField,
-) where
-    M: Mirror<D> + OpenGLRenderable + ?Sized,
-    R: IntoIterator<Item = SimulationRay<M::Scalar, D>>,
-    Vertex<D>: gl::Vertex,
-    Vertex<D>: From<SVector<M::Scalar, D>>,
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
+pub struct SimulationParams<S> {
+    epsilon: S,
+}
+
+impl<S: FloatCore + 'static> Default for SimulationParams<S>
+where
+    f64: AsPrimitive<S>,
 {
-    const DEFAULT_WIDTH: u32 = 1280;
-    const DEFAULT_HEIGHT: u32 = 720;
+    fn default() -> Self {
+        Self {
+            epsilon: S::epsilon() * 64.0.as_(),
+        }
+    }
+}
 
-    use glutin::{dpi, event_loop, window, ContextBuilder};
+pub struct SimulationWindow {
+    events_loop: glutin::event_loop::EventLoop<()>,
+    display: gl::Display,
+}
 
-    let el = event_loop::EventLoop::default();
-    let display = gl::Display::new(
-        window::WindowBuilder::new()
-            .with_inner_size(dpi::LogicalSize::new(DEFAULT_WIDTH, DEFAULT_HEIGHT))
-            .with_title("Reflect"),
-        ContextBuilder::new()
-            .with_vsync(true)
-            .with_multisampling(1 << 4),
-        &el,
-    )
-    .expect("failed to build display");
+impl SimulationWindow {
+    #[inline]
+    #[must_use]
+    pub fn new<'a, T: glutin::ContextCurrentState>(
+        wb: window::WindowBuilder,
+        cb: glutin::ContextBuilder<'a, T>,
+    ) -> Result<Self, DisplayCreationError> {
+        let events_loop = event_loop::EventLoop::default();
+        gl::Display::new(wb, cb, &events_loop).map(|display| Self {
+            events_loop,
+            display,
+        })
+    }
 
-    let app = App::from_simulation(mirror, rays, &display, default_eps);
+    #[inline]
+    pub fn run<const D: usize, M, R>(self, mirror: &M, rays: R, params: SimulationParams<M::Scalar>)
+    where
+        M: Mirror<D, Scalar: RealField> + OpenGLRenderable + ?Sized,
+        R: IntoIterator<Item = SimulationRay<M::Scalar, D>>,
+        Vertex<D>: gl::Vertex + From<SVector<M::Scalar, D>>,
+    {
+        let Self {
+            events_loop,
+            display,
+        } = self;
 
-    app.run(display, el);
+        let app = SimulationRenderData::from_simulation(mirror, rays, &display, params);
+
+        app.run(display, events_loop);
+    }
+}
+
+impl Default for SimulationWindow {
+    #[inline]
+    fn default() -> Self {
+        Self::new(
+            window::WindowBuilder::new()
+                .with_inner_size(dpi::LogicalSize::new(1280, 720))
+                .with_title("Reflect"),
+            glutin::ContextBuilder::new()
+                .with_vsync(true)
+                .with_multisampling(1 << 4),
+        )
+        .expect("failed to build display")
+    }
 }

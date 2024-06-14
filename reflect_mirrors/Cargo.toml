@@ -6,4 +6,4 @@ edition = "2021"
 [dependencies]
 
 reflect = { path = "../reflect" }
-arrayvec = { version = "0.7", default_features = false }
+arrayvec = { version = "0.7", default-features = false }

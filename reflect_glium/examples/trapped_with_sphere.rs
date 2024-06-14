@@ -1,5 +1,4 @@
-use reflect::Float;
-use reflect_glium::SimulationRay;
+use reflect_glium::{SimulationParams, SimulationRay, SimulationWindow};
 use reflect_mirrors::{Sphere, Triangle};
 
 fn main() {
@@ -12,29 +11,30 @@ fn main() {
     #[rustfmt::skip]
     let mirrors = (
         Sphere::new([0., 0., 0.], 4.),
-        [
-            // faces of the cube, use two triangles to form a square
-            Triangle::new([[ 5.,  5.,  5.], [ 5., -5.,  5.], [ 5.,  5., -5.]]),
-            Triangle::new([[ 5., -5., -5.], [ 5., -5.,  5.], [ 5.,  5., -5.]]),
-
-            Triangle::new([[-5.,  5.,  5.], [-5., -5.,  5.], [-5.,  5., -5.]]),
-            Triangle::new([[-5., -5., -5.], [-5., -5.,  5.], [-5.,  5., -5.]]),
-
-            Triangle::new([[ 5.,  5.,  5.], [-5.,  5.,  5.], [ 5.,  5., -5.]]),
-            Triangle::new([[-5.,  5., -5.], [-5.,  5.,  5.], [ 5.,  5., -5.]]),
-
-            Triangle::new([[ 5., -5.,  5.], [-5., -5.,  5.], [ 5., -5., -5.]]),
-            Triangle::new([[-5., -5., -5.], [-5., -5.,  5.], [ 5., -5., -5.]]),
-
-            Triangle::new([[ 5.,  5.,  5.], [ 5., -5.,  5.], [-5.,  5.,  5.]]),
-            Triangle::new([[-5., -5.,  5.], [ 5., -5.,  5.], [-5.,  5.,  5.]]),
-
-            Triangle::new([[ 5.,  5., -5.], [ 5., -5., -5.], [-5.,  5., -5.]]),
-            Triangle::new([[-5., -5., -5.], [ 5., -5., -5.], [-5.,  5., -5.]]),
+        [ // faces of the cube, two triangles form a square.
+            [
+                Triangle::new([[ 5.,  5.,  5.], [ 5., -5.,  5.], [ 5.,  5., -5.]]),
+                Triangle::new([[ 5., -5., -5.], [ 5., -5.,  5.], [ 5.,  5., -5.]]),
+            ], [
+                Triangle::new([[-5.,  5.,  5.], [-5., -5.,  5.], [-5.,  5., -5.]]),
+                Triangle::new([[-5., -5., -5.], [-5., -5.,  5.], [-5.,  5., -5.]]),
+            ], [
+                Triangle::new([[ 5.,  5.,  5.], [-5.,  5.,  5.], [ 5.,  5., -5.]]),
+                Triangle::new([[-5.,  5., -5.], [-5.,  5.,  5.], [ 5.,  5., -5.]]),
+            ], [
+                Triangle::new([[ 5., -5.,  5.], [-5., -5.,  5.], [ 5., -5., -5.]]),
+                Triangle::new([[-5., -5., -5.], [-5., -5.,  5.], [ 5., -5., -5.]]),
+            ], [
+                Triangle::new([[ 5.,  5.,  5.], [ 5., -5.,  5.], [-5.,  5.,  5.]]),
+                Triangle::new([[-5., -5.,  5.], [ 5., -5.,  5.], [-5.,  5.,  5.]]),
+            ], [
+                Triangle::new([[ 5.,  5., -5.], [ 5., -5., -5.], [-5.,  5., -5.]]),
+                Triangle::new([[-5., -5., -5.], [ 5., -5., -5.], [-5.,  5., -5.]]),
+            ],
         ],
     );
 
     let rays = [SimulationRay::new([4., 3., 0.1], [-1., -1., 0.]).with_reflection_cap(max)];
 
-    reflect_glium::run_simulation(&mirrors, rays, Float::EPSILON * 64.);
+    SimulationWindow::default().run(&mirrors, rays, SimulationParams::default());
 }

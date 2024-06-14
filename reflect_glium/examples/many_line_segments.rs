@@ -1,5 +1,4 @@
-use reflect::Float;
-use reflect_glium::SimulationRay;
+use reflect_glium::{SimulationParams, SimulationRay, SimulationWindow};
 use reflect_mirrors::LineSegment;
 
 fn main() {
@@ -46,5 +45,5 @@ fn main() {
 
     let rays = [SimulationRay::new([9., 5.], [1., 2.])];
 
-    reflect_glium::run_simulation(&mirrors, rays, Float::EPSILON * 64.)
+    SimulationWindow::default().run(&mirrors, rays, SimulationParams::default())
 }

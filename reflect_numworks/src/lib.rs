@@ -1,5 +1,6 @@
 #![no_std]
 
+use eadk::kandinsky::*;
 use num_traits::{float::FloatCore, AsPrimitive};
 use reflect::{
     nalgebra::{RealField, SVector, SimdComplexField, Unit},
@@ -9,6 +10,27 @@ use reflect::{
 #[impl_trait_for_tuples::impl_for_tuples(16)]
 pub trait KandinskyRenderable {
     fn draw(&self);
+}
+
+impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for reflect_mirrors::Sphere<S, 2> {
+    fn draw(&self) {
+        let [x, y] = self.center.into();
+        draw_circle(
+            x.as_(),
+            y.as_(),
+            self.radius().clone().as_() as u16,
+            Color::from_rgb([255, 0, 0]),
+        )
+    }
+}
+
+impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for reflect_mirrors::LineSegment<S> {
+    fn draw(&self) {
+        let [start, end] = self.vertices();
+        let [x0, y0] = start.into();
+        let [x1, y1] = end.into();
+        draw_line(x0.as_(), y0.as_(), x1.as_(), y1.as_(), Color::from_rgb([255, 0, 0]))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -113,12 +135,12 @@ pub fn run_simulation<M>(
             let [x0, y0]: [M::Scalar; 2] = (*prev).into();
             *prev = to;
             let [x1, y1] = to.into();
-            eadk::kandinsky::draw_line(
+            draw_line(
                 x0.as_(),
                 y0.as_(),
                 x1.as_(),
                 y1.as_(),
-                eadk::kandinsky::Color::from_rgb([255, 0, 0]),
+                Color::from_rgb([255, 0, 0]),
             );
         };
 
@@ -144,3 +166,4 @@ pub fn run_simulation<M>(
 
     mirror.draw();
 }
+

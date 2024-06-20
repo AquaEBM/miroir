@@ -108,14 +108,17 @@ impl<S, const D: usize> SimulationRay<S, D> {
         }
     }
 
+    /// # Safety
+    ///
+    /// `dir` must be a unit vector, or very close to one
     #[inline]
     #[must_use]
-    pub fn new_unchecked_dir(
+    pub unsafe fn new_unchecked_dir(
         origin: impl Into<SVector<S, D>>,
         dir: impl Into<SVector<S, D>>,
     ) -> Self {
         Self {
-            ray: Ray::new_unchecked_dir(origin, dir),
+            ray: Ray::new_unchecked(origin, dir),
             reflection_cap: None,
         }
     }
@@ -145,10 +148,10 @@ impl<S: SimdComplexField, const D: usize> SimulationRay<S, D> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SimulationParams<S> {
-    epsilon: S,
+    pub epsilon: S,
+    pub detect_loops: bool,
 }
 
 impl<S: FloatCore + 'static> Default for SimulationParams<S>
@@ -158,6 +161,7 @@ where
     fn default() -> Self {
         Self {
             epsilon: S::epsilon() * 64.0.as_(),
+            detect_loops: false,
         }
     }
 }
@@ -169,10 +173,9 @@ pub struct SimulationWindow {
 
 impl SimulationWindow {
     #[inline]
-    #[must_use]
-    pub fn new<'a, T: glutin::ContextCurrentState>(
+    pub fn new<T: glutin::ContextCurrentState>(
         wb: window::WindowBuilder,
-        cb: glutin::ContextBuilder<'a, T>,
+        cb: glutin::ContextBuilder<T>,
     ) -> Result<Self, DisplayCreationError> {
         let events_loop = event_loop::EventLoop::default();
         gl::Display::new(wb, cb, &events_loop).map(|display| Self {
@@ -182,10 +185,13 @@ impl SimulationWindow {
     }
 
     #[inline]
-    pub fn run<const D: usize, M, R>(self, mirror: &M, rays: R, params: SimulationParams<M::Scalar>)
-    where
+    pub fn run<const D: usize, M>(
+        self,
+        mirror: &M,
+        rays: impl IntoIterator<Item = SimulationRay<M::Scalar, D>>,
+        params: SimulationParams<M::Scalar>,
+    ) where
         M: Mirror<D, Scalar: RealField> + OpenGLRenderable + ?Sized,
-        R: IntoIterator<Item = SimulationRay<M::Scalar, D>>,
         Vertex<D>: gl::Vertex + From<SVector<M::Scalar, D>>,
     {
         let Self {

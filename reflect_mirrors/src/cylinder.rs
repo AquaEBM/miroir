@@ -82,7 +82,7 @@ impl<S: RealField> Cylinder<S> {
 
         let a = (d - &pd).norm_squared();
         let dpm = d.dot(&pm);
-        let b = (pm.dot(&pd) + m.dot(&d)) - (dpm.clone() + dpm);
+        let b = (pm.dot(&pd) + m.dot(d)) - (dpm.clone() + dpm);
         let c = (&m - pm).norm_squared() - self.radius_sq.clone();
 
         let delta = c.mul_add(-a.clone(), b.clone() * b.clone());
@@ -118,7 +118,7 @@ impl<S: RealField> Mirror<3> for Cylinder<S> {
     fn add_tangents(&self, ctx: &SimulationCtx<Self::Scalar, 3>) {
         for (d, n) in self.tangents_at_intersections(ctx.ray) {
             ctx.add_tangent(Plane {
-                intersection: Intersection::Distance(d),
+                intersection: PlaneOffset::DistanceToRay(d),
                 direction: HyperPlane::Normal(n),
             });
         }

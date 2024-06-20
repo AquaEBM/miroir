@@ -129,7 +129,7 @@ where
         mirror.append_render_data(display, &mut mirrors);
 
         let mut vertex_scratch = vec![];
-        let mut point_scratch = vec![];
+        let mut pt_scratch = vec![];
 
         let mut mirrors = mirrors.into_inner();
         let mut ray_origins = vec![];
@@ -145,41 +145,47 @@ where
             ray_origins.push(Vertex::from(origin.clone()));
 
             vertex_scratch.clear();
-            point_scratch.clear();
-            point_scratch.push(origin);
+            pt_scratch.push(origin);
 
             let mut path = RayPath::new(mirror, ray, params.epsilon.clone());
 
             let path_iter = path.by_ref();
 
-            let causes_loop = |point: SVector<_, D>| {
-                let out = loop_index(&point_scratch, &point, params.epsilon.clone());
-                if out.is_none() {
-                    point_scratch.push(point);
+            let outcome = 'block: {
+                if let Some(n) = reflection_cap {
+                    for pt in path_iter.take(n) {
+                        let out = loop_index(&pt_scratch, &pt, params.epsilon.clone());
+                        if out.is_some() {
+                            break 'block Some(out);
+                        }
+
+                        pt_scratch.push(pt);
+                    }
+
+                    (pt_scratch.len() <= n).then_some(None)
+                } else {
+                    for pt in path_iter {
+                        let out = loop_index(&pt_scratch, &pt, params.epsilon.clone());
+                        if out.is_some() {
+                            break 'block Some(out);
+                        }
+
+                        pt_scratch.push(pt);
+                    }
+
+                    Some(None)
                 }
-                out
-            };
-
-            let outcome = if let Some(n) = reflection_cap {
-                let loop_idx = path_iter.take(n).find_map(causes_loop);
-
-                loop_idx
-                    .is_some()
-                    .then_some(loop_idx)
-                    .or_else(|| (point_scratch.len() <= n).then_some(None))
-            } else {
-                Some(path_iter.find_map(causes_loop))
             };
 
             let loop_path = if let Some(Some(loop_index)) = outcome {
-                vertex_scratch.extend(point_scratch.drain(loop_index..).map(Vertex::from));
+                vertex_scratch.extend(pt_scratch.drain(loop_index..).map(Vertex::from));
                 gl::VertexBuffer::immutable(display, &vertex_scratch).unwrap()
             } else {
                 gl::VertexBuffer::empty_immutable(display, 0).unwrap()
             };
 
             vertex_scratch.clear();
-            vertex_scratch.extend(point_scratch.drain(..).map(Vertex::from));
+            vertex_scratch.extend(pt_scratch.drain(..).map(Vertex::from));
 
             if let Some(None) = outcome {
                 let last = *vertex_scratch.last().unwrap();

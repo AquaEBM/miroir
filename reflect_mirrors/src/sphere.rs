@@ -31,7 +31,6 @@ impl<S: ComplexField, const D: usize> Sphere<S, D> {
     }
 
     #[inline]
-    #[must_use]
     pub fn set_radius(&mut self, r: S::RealField) {
         self.radius = r.clone().abs();
         self.radius_sq = r.clone() * r;
@@ -79,7 +78,7 @@ impl<S: ComplexField, const D: usize> Mirror<D> for Sphere<S, D> {
         if let Some(tangents) = self.tangents_at_intersections(ctx.ray) {
             for (d, n) in tangents {
                 ctx.add_tangent(Plane {
-                    intersection: Intersection::Distance(d),
+                    intersection: PlaneOffset::DistanceToRay(d),
                     direction: HyperPlane::Normal(n),
                 });
             }

@@ -42,9 +42,12 @@ impl<S, const D: usize> Ray<S, D> {
         }
     }
 
+    /// # Safety
+    ///
+    /// `dir` must be a unit vector, or very close to one
     #[inline]
     #[must_use]
-    pub fn new_unchecked_dir(
+    pub unsafe fn new_unchecked(
         origin: impl Into<SVector<S, D>>,
         dir: impl Into<SVector<S, D>>,
     ) -> Self {
@@ -389,19 +392,19 @@ impl<S: ComplexField, const D: usize> HyperPlane<S, D> {
 ///
 /// It may be provided directly or be at a certain distance from a ray.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Intersection<S, const D: usize> {
+pub enum PlaneOffset<S, const D: usize> {
     /// If a [`Mirror`] returns `Intersection::Distance(t)` when calculating it's intersections with a `ray`, then `ray.at(t)` belongs to the returned tangent (hyper)plane.
     ///
     /// This is useful if `t` is easy to calculate.
-    Distance(S),
+    DistanceToRay(S),
     /// Note that the point in this vector doesn't necessarily intersect with the ray, but it serves as an offset point for the plane represented by [`Plane`]
-    StartingPoint(SVector<S, D>),
+    Vector(SVector<S, D>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 /// Different ways of representing an _affine_ hyperplane in `D`-dimensional euclidean space
 pub struct Plane<S, const D: usize> {
-    pub intersection: Intersection<S, D>,
+    pub intersection: PlaneOffset<S, D>,
     pub direction: HyperPlane<S, D>,
 }
 
@@ -413,8 +416,8 @@ impl<S: ComplexField, const D: usize> Plane<S, D> {
     #[must_use]
     pub fn try_ray_intersection(&self, ray: &Ray<S, D>) -> Option<S> {
         match &self.intersection {
-            Intersection::Distance(t) => Some(t.clone()),
-            Intersection::StartingPoint(p) => self.direction.try_ray_intersection(p, ray),
+            PlaneOffset::DistanceToRay(t) => Some(t.clone()),
+            PlaneOffset::Vector(p) => self.direction.try_ray_intersection(p, ray),
         }
     }
 }
@@ -428,10 +431,10 @@ impl<S: ComplexField, const D: usize> Plane<S, D> {
 /// exists in (and thus, the size of the vectors used for it's calulcations).
 ///
 /// Some mirrors, exist and are easy to implement in all dimensions. Hence why they implement
-/// [`Mirror<D>`] for all `D`. Others can only implemented in _some_ dimensions, like 2, or 3.
+/// [`Mirror<D>`] for all (non-zero) `D`. Others can only be implemented in _some_ dimensions,
+/// like 2, or 3.
 ///
-/// Running simulations with mirrors in 0 dimensions will cause panics or return unspecified
-/// results.
+/// `D` is expected to be non-zero. The behavior is unspecified it `D = 0`.
 ///
 /// `D` could have been an associated constant, but, lack of
 /// `#[feature(generic_const_exprs)]` makes this difficult
@@ -560,7 +563,7 @@ impl<'a, const D: usize, M: Mirror<D> + ?Sized> RayPath<'a, D, M> {
     #[inline]
     #[must_use]
     pub const fn mirror(&self) -> &M {
-        &self.mirror
+        self.mirror
     }
 }
 
@@ -569,8 +572,8 @@ impl<'a, const D: usize, M: Mirror<D> + ?Sized> Iterator for RayPath<'a, D, M> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let mut ctx = SimulationCtx::new(&self.ray, self.eps.clone());
-        self.mirror.add_tangents(&mut ctx);
+        let ctx = SimulationCtx::new(&self.ray, self.eps.clone());
+        self.mirror.add_tangents(&ctx);
         let closest = ctx.into_closest();
 
         let ray = &mut self.ray;

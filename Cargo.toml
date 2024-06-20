@@ -4,6 +4,7 @@ members = [
     "reflect",
     "reflect_glium",
     "reflect_mirrors",
+    "reflect_numworks",
 ]
 
 resolver = "2"

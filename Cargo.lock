@@ -118,9 +118,9 @@ checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
 
 [[package]]
 name = "bytemuck"
-version = "1.16.0"
+version = "1.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78834c15cb5d5efe3452d58b1e8ba890dd62d21907f867f383358198e56ebca5"
+checksum = "b236fc92302c97ed75b38da1f4917b5cdda4984745740f153a5d3059e48d725e"
 
 [[package]]
 name = "calloop"
@@ -414,6 +414,11 @@ dependencies = [
  "winapi",
  "wio",
 ]
+
+[[package]]
+name = "eadk"
+version = "0.1.0"
+source = "git+https://github.com/AquaEBM/eadk_rs#3f5922e79183b821c6d847608f26139e4c0db2c7"
 
 [[package]]
 name = "equivalent"
@@ -793,9 +798,9 @@ dependencies = [
 
 [[package]]
 name = "miniz_oxide"
-version = "0.7.3"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87dfd01fe195c66b572b37921ad8803d010623c0aca821bea2302239d155cdae"
+checksum = "b8a240ddb74feaf34a79a7add65a741f3167852fba007066dcac1ca548d89c08"
 dependencies = [
  "adler",
  "simd-adler32",
@@ -1271,6 +1276,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "reflect_numworks"
+version = "0.1.0"
+dependencies = [
+ "eadk",
+ "impl-trait-for-tuples",
+ "num-traits",
+ "reflect",
+ "reflect_mirrors",
+]
+
+[[package]]
 name = "rustc-demangle"
 version = "0.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1287,9 +1303,9 @@ dependencies = [
 
 [[package]]
 name = "safe_arch"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f398075ce1e6a179b46f51bd88d0598b92b00d3551f1a2d4ac49e771b56ac354"
+checksum = "c3460605018fdc9612bce72735cba0d27efbcd9904780d44c7e3a9948f96148a"
 dependencies = [
  "bytemuck",
 ]
@@ -1702,7 +1718,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a040b111774ab63a19ef46bbc149398ab372b4ccdcfd719e9814dbd7dfd76c8"
 dependencies = [
  "bytemuck",
- "safe_arch 0.7.1",
+ "safe_arch 0.7.2",
 ]
 
 [[package]]

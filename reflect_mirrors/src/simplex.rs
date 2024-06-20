@@ -112,7 +112,7 @@ impl<S: RealField, const D: usize> Mirror<D> for Simplex<S, D> {
                 // We could return `Intersection::StartingPoint(self.plane.v0())`, but
                 // we already calculated `t`.
                 // We might as well save the simulation runner some work, and return that
-                intersection: Intersection::Distance(t),
+                intersection: PlaneOffset::DistanceToRay(t),
                 direction: HyperPlane::Plane(direction.clone()),
             });
         }

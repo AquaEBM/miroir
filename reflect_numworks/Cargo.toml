@@ -7,7 +7,11 @@ edition = "2021"
 [dependencies]
 
 impl-trait-for-tuples = "0.2"
-reflect = { path = "../reflect" }
+reflect = { path = "../reflect", default_features = false }
 reflect_mirrors = { path = "../reflect_mirrors" }
 num-traits = { version = "0.2", default-features = false }
 eadk = { git = "https://github.com/AquaEBM/eadk_rs" }
+
+[features]
+default = ["alloc"]
+alloc = ["reflect/alloc"]

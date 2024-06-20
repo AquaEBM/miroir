@@ -8,7 +8,9 @@ use reflect::{
 };
 use core::ops::Deref;
 
+#[cfg(feature = "alloc")]
 extern crate alloc;
+#[cfg(feature = "alloc")]
 use alloc::{boxed::Box, rc::Rc, sync::Arc, vec::Vec};
 
 #[impl_trait_for_tuples::impl_for_tuples(16)]
@@ -28,6 +30,16 @@ impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for reflect_mirrors::S
     }
 }
 
+impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for reflect_mirrors::LineSegment<S> {
+    fn draw(&self) {
+        let [start, end] = self.vertices();
+        let [x0, y0] = start.into();
+        let [x1, y1] = end.into();
+        draw_line(x0.as_(), y0.as_(), x1.as_(), y1.as_(), Color::from_rgb([255, 0, 0]))
+    }
+}
+
+
 impl<T: KandinskyRenderable> KandinskyRenderable for [T] {
     fn draw(&self) {
         self.iter()
@@ -44,24 +56,28 @@ impl<const N: usize, T: KandinskyRenderable> KandinskyRenderable for [T; N] {
 // It's clear that all these impls use the `Deref` trait, but writing a blanket impl over all
 // types implementing `Deref` makes the trait unusable downstream
 
+#[cfg(feature = "alloc")]
 impl<T: KandinskyRenderable + ?Sized> KandinskyRenderable for Box<T> {
     fn draw(&self) {
         self.deref().draw();
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<T: KandinskyRenderable + ?Sized> KandinskyRenderable for Arc<T> {
     fn draw(&self) {
         self.deref().draw();
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<T: KandinskyRenderable + ?Sized> KandinskyRenderable for Rc<T> {
     fn draw(&self) {
         self.deref().draw();
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<T: KandinskyRenderable> KandinskyRenderable for Vec<T> {
     fn draw(&self) {
         self.deref().draw();
@@ -77,15 +93,6 @@ impl<'a, T: KandinskyRenderable + ?Sized> KandinskyRenderable for &'a T {
 impl<'a, T: KandinskyRenderable + ?Sized> KandinskyRenderable for &'a mut T {
     fn draw(&self) {
         self.deref().draw();
-    }
-}
-
-impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for reflect_mirrors::LineSegment<S> {
-    fn draw(&self) {
-        let [start, end] = self.vertices();
-        let [x0, y0] = start.into();
-        let [x1, y1] = end.into();
-        draw_line(x0.as_(), y0.as_(), x1.as_(), y1.as_(), Color::from_rgb([255, 0, 0]))
     }
 }
 

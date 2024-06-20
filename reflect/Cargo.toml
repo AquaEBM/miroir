@@ -7,3 +7,8 @@ edition = "2021"
 
 nalgebra = { version = "0.32", features = ["libm"], default-features = false }
 impl-trait-for-tuples = "0.2"
+
+[features]
+
+default = ["alloc"]
+alloc = []

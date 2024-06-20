@@ -1,7 +1,8 @@
 #![no_std]
 
+#[cfg(feature = "alloc")]
 extern crate alloc;
-
+#[cfg(feature = "alloc")]
 use alloc::{boxed::Box, rc::Rc, sync::Arc, vec::Vec};
 use core::{
     cell::Cell,
@@ -488,7 +489,7 @@ impl<const N: usize, const D: usize, T: Mirror<D>> Mirror<D> for [T; N] {
 
 // It's clear that all these impls use the `Deref` trait, but writing a blanket impl over all types implementing `Deref`
 // makes it impossible to implement it for new types downstream.
-
+#[cfg(feature = "alloc")]
 impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Box<T> {
     type Scalar = T::Scalar;
     #[inline]
@@ -497,6 +498,7 @@ impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Box<T> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Arc<T> {
     type Scalar = T::Scalar;
     #[inline]
@@ -505,6 +507,7 @@ impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Arc<T> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Rc<T> {
     type Scalar = T::Scalar;
     #[inline]
@@ -513,6 +516,7 @@ impl<const D: usize, T: Mirror<D> + ?Sized> Mirror<D> for Rc<T> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<const D: usize, T: Mirror<D>> Mirror<D> for Vec<T> {
     type Scalar = T::Scalar;
     #[inline]

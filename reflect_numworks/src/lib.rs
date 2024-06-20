@@ -6,6 +6,10 @@ use reflect::{
     nalgebra::{RealField, SVector, SimdComplexField, Unit},
     Mirror, Ray, RayPath,
 };
+use core::ops::Deref;
+
+extern crate alloc;
+use alloc::{boxed::Box, rc::Rc, sync::Arc, vec::Vec};
 
 #[impl_trait_for_tuples::impl_for_tuples(16)]
 pub trait KandinskyRenderable {
@@ -21,6 +25,58 @@ impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for reflect_mirrors::S
             self.radius().clone().as_() as u16,
             Color::from_rgb([255, 0, 0]),
         )
+    }
+}
+
+impl<T: KandinskyRenderable> KandinskyRenderable for [T] {
+    fn draw(&self) {
+        self.iter()
+            .for_each(|a| a.draw());
+    }
+}
+
+impl<const N: usize, T: KandinskyRenderable> KandinskyRenderable for [T; N] {
+    fn draw(&self) {
+        self.as_slice().draw();
+    }
+}
+
+// It's clear that all these impls use the `Deref` trait, but writing a blanket impl over all
+// types implementing `Deref` makes the trait unusable downstream
+
+impl<T: KandinskyRenderable + ?Sized> KandinskyRenderable for Box<T> {
+    fn draw(&self) {
+        self.deref().draw();
+    }
+}
+
+impl<T: KandinskyRenderable + ?Sized> KandinskyRenderable for Arc<T> {
+    fn draw(&self) {
+        self.deref().draw();
+    }
+}
+
+impl<T: KandinskyRenderable + ?Sized> KandinskyRenderable for Rc<T> {
+    fn draw(&self) {
+        self.deref().draw();
+    }
+}
+
+impl<T: KandinskyRenderable> KandinskyRenderable for Vec<T> {
+    fn draw(&self) {
+        self.deref().draw();
+    }
+}
+
+impl<'a, T: KandinskyRenderable + ?Sized> KandinskyRenderable for &'a T {
+    fn draw(&self) {
+        (*self).draw();
+    }
+}
+
+impl<'a, T: KandinskyRenderable + ?Sized> KandinskyRenderable for &'a mut T {
+    fn draw(&self) {
+        self.deref().draw();
     }
 }
 

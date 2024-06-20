@@ -5,5 +5,5 @@ edition = "2021"
 
 [dependencies]
 
-nalgebra = { version = "0.32", features = ["libm"] }
+nalgebra = { version = "0.32", features = ["libm"], default-features = false }
 impl-trait-for-tuples = "0.2"

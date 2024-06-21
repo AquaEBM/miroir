@@ -106,7 +106,7 @@ impl<const D: usize, S: PartialEq> PartialEq for SimulationRay<S, D> {
 }
 
 impl<S, const D: usize> SimulationRay<S, D> {
-    const DEFAULT_COLOR: Color = Color::from_rgb([255, 0, 0]);
+    const DEFAULT_COLOR: Color = Color::from_rgb([255, 127, 0]);
     #[inline]
     #[must_use]
     pub fn new_unit_dir(origin: impl Into<SVector<S, D>>, dir: Unit<SVector<S, D>>) -> Self {
@@ -164,6 +164,7 @@ pub struct SimulationParams<S> {
     pub epsilon: S,
     pub detect_loops: bool,
     pub mirror_color: Color,
+    pub step_time_ms: u32,
 }
 
 impl<S: FloatCore + 'static> Default for SimulationParams<S>
@@ -174,7 +175,8 @@ where
         Self {
             epsilon: S::epsilon() * 64.0.as_(),
             detect_loops: false,
-            mirror_color: Color::from_rgb([255, 127, 0]),
+            mirror_color: Color::from_rgb([255, 0, 0]),
+            step_time_ms: 0,
         }
     }
 }
@@ -209,6 +211,7 @@ pub fn run_simulation<M>(
                 y1.as_(),
                 color,
             );
+            eadk::time::sleep_ms(params.step_time_ms);
         };
 
         let diverges = if let Some(n) = reflection_cap {

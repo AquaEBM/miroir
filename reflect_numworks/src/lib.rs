@@ -17,41 +17,35 @@ pub use eadk;
 
 #[impl_trait_for_tuples::impl_for_tuples(16)]
 pub trait KandinskyRenderable {
-    fn draw(&self);
+    fn draw(&self, color: Color);
 }
 
 impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for reflect_mirrors::Sphere<S, 2> {
-    fn draw(&self) {
+    fn draw(&self, color: Color) {
         let [x, y] = self.center.into();
-        draw_circle(
-            x.as_(),
-            y.as_(),
-            self.radius().clone().as_() as u16,
-            Color::from_rgb([255, 0, 0]),
-        )
+        draw_circle(x.as_(), y.as_(), self.radius().clone().as_() as u16, color)
     }
 }
 
 impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for reflect_mirrors::LineSegment<S> {
-    fn draw(&self) {
+    fn draw(&self, color: Color) {
         let [start, end] = self.vertices();
         let [x0, y0] = start.into();
         let [x1, y1] = end.into();
-        draw_line(x0.as_(), y0.as_(), x1.as_(), y1.as_(), Color::from_rgb([255, 0, 0]))
+        draw_line(x0.as_(), y0.as_(), x1.as_(), y1.as_(), color)
     }
 }
 
-
 impl<T: KandinskyRenderable> KandinskyRenderable for [T] {
-    fn draw(&self) {
+    fn draw(&self, color: Color) {
         self.iter()
-            .for_each(|a| a.draw());
+            .for_each(|a| a.draw(color));
     }
 }
 
 impl<const N: usize, T: KandinskyRenderable> KandinskyRenderable for [T; N] {
-    fn draw(&self) {
-        self.as_slice().draw();
+    fn draw(&self, color: Color) {
+        self.as_slice().draw(color);
     }
 }
 
@@ -60,41 +54,41 @@ impl<const N: usize, T: KandinskyRenderable> KandinskyRenderable for [T; N] {
 
 #[cfg(feature = "alloc")]
 impl<T: KandinskyRenderable + ?Sized> KandinskyRenderable for Box<T> {
-    fn draw(&self) {
-        self.deref().draw();
+    fn draw(&self, color: Color) {
+        self.deref().draw(color);
     }
 }
 
 #[cfg(feature = "alloc")]
 impl<T: KandinskyRenderable + ?Sized> KandinskyRenderable for Arc<T> {
-    fn draw(&self) {
-        self.deref().draw();
+    fn draw(&self, color: Color) {
+        self.deref().draw(color);
     }
 }
 
 #[cfg(feature = "alloc")]
 impl<T: KandinskyRenderable + ?Sized> KandinskyRenderable for Rc<T> {
-    fn draw(&self) {
-        self.deref().draw();
+    fn draw(&self, color: Color) {
+        self.deref().draw(color);
     }
 }
 
 #[cfg(feature = "alloc")]
 impl<T: KandinskyRenderable> KandinskyRenderable for Vec<T> {
-    fn draw(&self) {
-        self.deref().draw();
+    fn draw(&self, color: Color) {
+        self.deref().draw(color);
     }
 }
 
 impl<'a, T: KandinskyRenderable + ?Sized> KandinskyRenderable for &'a T {
-    fn draw(&self) {
-        (*self).draw();
+    fn draw(&self, color: Color) {
+        (*self).draw(color);
     }
 }
 
 impl<'a, T: KandinskyRenderable + ?Sized> KandinskyRenderable for &'a mut T {
-    fn draw(&self) {
-        self.deref().draw();
+    fn draw(&self, color: Color) {
+        self.deref().draw(color);
     }
 }
 
@@ -102,6 +96,7 @@ impl<'a, T: KandinskyRenderable + ?Sized> KandinskyRenderable for &'a mut T {
 pub struct SimulationRay<S, const D: usize> {
     pub ray: Ray<S, D>,
     reflection_cap: Option<usize>,
+    color: Color,
 }
 
 impl<const D: usize, S: PartialEq> PartialEq for SimulationRay<S, D> {
@@ -111,12 +106,14 @@ impl<const D: usize, S: PartialEq> PartialEq for SimulationRay<S, D> {
 }
 
 impl<S, const D: usize> SimulationRay<S, D> {
+    const DEFAULT_COLOR: Color = Color::from_rgb([255, 0, 0]);
     #[inline]
     #[must_use]
     pub fn new_unit_dir(origin: impl Into<SVector<S, D>>, dir: Unit<SVector<S, D>>) -> Self {
         Self {
             ray: Ray::new_unit_dir(origin, dir),
             reflection_cap: None,
+            color: Self::DEFAULT_COLOR,
         }
     }
 
@@ -132,6 +129,7 @@ impl<S, const D: usize> SimulationRay<S, D> {
         Self {
             ray: Ray::new_unchecked(origin, dir),
             reflection_cap: None,
+            color: Self::DEFAULT_COLOR,
         }
     }
 
@@ -156,6 +154,7 @@ impl<S: SimdComplexField, const D: usize> SimulationRay<S, D> {
         Self {
             ray: Ray::new(origin, dir),
             reflection_cap: None,
+            color: Self::DEFAULT_COLOR,
         }
     }
 }
@@ -164,6 +163,7 @@ impl<S: SimdComplexField, const D: usize> SimulationRay<S, D> {
 pub struct SimulationParams<S> {
     pub epsilon: S,
     pub detect_loops: bool,
+    pub mirror_color: Color,
 }
 
 impl<S: FloatCore + 'static> Default for SimulationParams<S>
@@ -174,6 +174,7 @@ where
         Self {
             epsilon: S::epsilon() * 64.0.as_(),
             detect_loops: false,
+            mirror_color: Color::from_rgb([255, 127, 0]),
         }
     }
 }
@@ -186,11 +187,12 @@ pub fn run_simulation<M>(
     M: Mirror<2, Scalar: RealField + AsPrimitive<i16>> + KandinskyRenderable + ?Sized,
     f64: AsPrimitive<M::Scalar>,
 {
-    mirror.draw();
+    mirror.draw(params.mirror_color);
 
     for SimulationRay {
         ray,
         reflection_cap,
+        color
     } in rays
     {
         let mut prev_pt = ray.origin;
@@ -205,7 +207,7 @@ pub fn run_simulation<M>(
                 y0.as_(),
                 x1.as_(),
                 y1.as_(),
-                Color::from_rgb([255, 0, 0]),
+                color,
             );
         };
 
@@ -228,7 +230,5 @@ pub fn run_simulation<M>(
             connect_line(&mut prev_pt, new_pt);
         }
     }
-
-    mirror.draw();
 }
 

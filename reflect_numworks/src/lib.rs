@@ -13,6 +13,8 @@ extern crate alloc;
 #[cfg(feature = "alloc")]
 use alloc::{boxed::Box, rc::Rc, sync::Arc, vec::Vec};
 
+pub use eadk;
+
 #[impl_trait_for_tuples::impl_for_tuples(16)]
 pub trait KandinskyRenderable {
     fn draw(&self);

@@ -14,15 +14,16 @@ The [`reflect_mirrors`](reflect_mirrors) crate contains several example implemen
 
 There are integrations extending this library with more functionality such as:
 
-- [`reflect_glium`](reflect_glium) Which enables running and visualising 2D and 3D simulations using OpenGL.
-
-...more to come soon.
+- [`reflect_glium`](reflect_glium), which enables running and visualising 2D and 3D simulations using OpenGL.
+- [`reflect_numworks`](reflect_numworks), which enables running and visualizing 2D simulations on the screen of your [Numworks Graphing Calculator](https://www.numworks.com/). This serves mainly as an example of `reflect` being used in a bare-metal environment.
 
 Other third-party integrations can easily be created over the simple API of the [`reflect`](reflect) crate. It is advised to check it's documentation:
 
 ```shell
 cargo doc -p reflect --no-deps --open
 ```
+
+Be sure to check out the mirrors in the [`reflect_mirrors`](reflect_mirrors) crate, and make sure to implement for them whatever new functionality you expose.
 
 ### Controls for `reflect_glium`
 
@@ -43,3 +44,10 @@ cargo run -r -p reflect_glium --example <example_name>
 ```
 
 where `<example_name>` is the name of the example's source file (without the trailing `.rs`)
+
+#### TODOs and known issues:
+
+ - Lots and lots of documentation
+ - Running simulations in single-precision (`f32`) may result in incoherent behavior especially when the number of reflections is high (> ~500). Use `f64`, or set the epsilon parameter to a high enough value (e. g. `1e-4`).
+ - [`reflect_glium`](reflect_glium) visualisations lack customization, mainly in the choice of colors...
+ - 3D simulations in [`reflect_glium`](reflect_glium) lack any kind of lighting, and hence viewing complex, curved, surfaces is awkward. I am not (yet?) well-versed enough in 3D rendering to know how to implement this neatly.

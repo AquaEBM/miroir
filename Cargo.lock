@@ -418,7 +418,7 @@ dependencies = [
 [[package]]
 name = "eadk"
 version = "0.1.0"
-source = "git+https://github.com/AquaEBM/eadk_rs#9afea86bf294ab284936a2d3a9822584eda4614f"
+source = "git+https://github.com/AquaEBM/eadk_rs#1ac5b58f16966c6af736e09afa0b07405e95353d"
 
 [[package]]
 name = "equivalent"

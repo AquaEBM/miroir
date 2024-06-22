@@ -1,12 +1,12 @@
 #![no_std]
 
+use core::ops::Deref;
 use eadk::kandinsky::*;
 use num_traits::{float::FloatCore, AsPrimitive};
 use reflect::{
     nalgebra::{RealField, SVector, SimdComplexField, Unit},
     Mirror, Ray, RayPath,
 };
-use core::ops::Deref;
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -23,7 +23,15 @@ pub trait KandinskyRenderable {
 impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for reflect_mirrors::Sphere<S, 2> {
     fn draw(&self, color: Color) {
         let [x, y] = self.center.into();
-        draw_circle(x.as_(), y.as_(), self.radius().clone().as_() as u16, color)
+
+        draw_circle(
+            Point {
+                x: x.as_(),
+                y: y.as_(),
+            },
+            self.radius().clone().as_().unsigned_abs(),
+            color,
+        )
     }
 }
 
@@ -32,14 +40,13 @@ impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for reflect_mirrors::L
         let [start, end] = self.vertices();
         let [x0, y0] = start.into();
         let [x1, y1] = end.into();
-        draw_line(x0.as_(), y0.as_(), x1.as_(), y1.as_(), color)
+        draw_line(Point { x: x0.as_(), y: y0.as_() }, Point { x: x1.as_(), y: y1.as_() }, color)
     }
 }
 
 impl<T: KandinskyRenderable> KandinskyRenderable for [T] {
     fn draw(&self, color: Color) {
-        self.iter()
-            .for_each(|a| a.draw(color));
+        self.iter().for_each(|a| a.draw(color));
     }
 }
 
@@ -194,7 +201,7 @@ pub fn run_simulation<M>(
     for SimulationRay {
         ray,
         reflection_cap,
-        color
+        color,
     } in rays
     {
         let mut prev_pt = ray.origin;
@@ -204,13 +211,7 @@ pub fn run_simulation<M>(
             let [x0, y0]: [M::Scalar; 2] = (*prev).into();
             *prev = to;
             let [x1, y1] = to.into();
-            draw_line(
-                x0.as_(),
-                y0.as_(),
-                x1.as_(),
-                y1.as_(),
-                color,
-            );
+            draw_line(Point { x: x0.as_(), y: y0.as_() }, Point { x: x1.as_(), y: y1.as_() }, color);
             eadk::time::sleep_ms(params.step_time_ms);
         };
 
@@ -234,4 +235,3 @@ pub fn run_simulation<M>(
         }
     }
 }
-

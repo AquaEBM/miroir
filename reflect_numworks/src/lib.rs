@@ -46,7 +46,9 @@ impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for reflect_mirrors::L
 
 impl<T: KandinskyRenderable> KandinskyRenderable for [T] {
     fn draw(&self, color: Color) {
-        self.iter().for_each(|a| a.draw(color));
+        for mirror in self {
+            mirror.draw(color)
+        }
     }
 }
 
@@ -102,8 +104,8 @@ impl<'a, T: KandinskyRenderable + ?Sized> KandinskyRenderable for &'a mut T {
 #[derive(Debug, Clone)]
 pub struct SimulationRay<S, const D: usize> {
     pub ray: Ray<S, D>,
-    reflection_cap: Option<usize>,
-    color: Color,
+    pub reflection_cap: Option<usize>,
+    pub color: Color,
 }
 
 impl<const D: usize, S: PartialEq> PartialEq for SimulationRay<S, D> {

@@ -10,13 +10,12 @@ use std::time;
 pub use glium as gl;
 pub use glium_shapes as gl_shapes;
 
-use cgmath as cg;
 use gl::glutin;
 
 use gl::backend::glutin::DisplayCreationError;
 
 use glutin::{dpi, event_loop, window};
-use nalgebra::{self as na, RealField, SVector, Scalar, SimdComplexField, Unit};
+use nalgebra::{self as na, ComplexField, RealField, SVector, Scalar, Unit};
 use reflect::*;
 
 mod camera;
@@ -24,8 +23,6 @@ mod renderable;
 mod sim_render_data;
 
 pub use renderable::*;
-
-use camera::{Camera, CameraController, Projection};
 use sim_render_data::SimulationRenderData;
 
 #[derive(Copy, Clone, Debug)]
@@ -89,7 +86,7 @@ where
 #[derive(Debug, Clone)]
 pub struct SimulationRay<S, const D: usize> {
     pub ray: Ray<S, D>,
-    reflection_cap: Option<usize>,
+    pub reflection_cap: Option<usize>,
 }
 
 impl<const D: usize, S: PartialEq> PartialEq for SimulationRay<S, D> {
@@ -98,35 +95,36 @@ impl<const D: usize, S: PartialEq> PartialEq for SimulationRay<S, D> {
     }
 }
 
+impl<S, const D: usize> From<Ray<S, D>> for SimulationRay<S, D> {
+    fn from(ray: Ray<S, D>) -> Self {
+        Self::from_ray(ray)
+    }
+}
+
 impl<S, const D: usize> SimulationRay<S, D> {
     #[inline]
     #[must_use]
-    pub fn new_unit_dir(origin: impl Into<SVector<S, D>>, dir: Unit<SVector<S, D>>) -> Self {
+    pub const fn from_ray(ray: Ray<S, D>) -> Self {
         Self {
-            ray: Ray::new_unit_dir(origin, dir),
+            ray,
             reflection_cap: None,
         }
     }
 
-    /// # Safety
-    ///
-    /// `dir` must be a unit vector, or very close to one
     #[inline]
     #[must_use]
-    pub unsafe fn new_unchecked_dir(
+    pub fn new_unit_dir(origin: impl Into<SVector<S, D>>, dir: Unit<SVector<S, D>>) -> Self {
+        Self::from_ray(Ray::new_unit_dir(origin, dir))
+    }
+
+    /// Does not normalize `dir`
+    #[inline]
+    #[must_use]
+    pub fn new_unchecked_dir(
         origin: impl Into<SVector<S, D>>,
         dir: impl Into<SVector<S, D>>,
     ) -> Self {
-        Self {
-            ray: Ray::new_unchecked(origin, dir),
-            reflection_cap: None,
-        }
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn max_reflections(&self) -> Option<&usize> {
-        self.reflection_cap.as_ref()
+        Self::from_ray(Ray::new_unchecked_dir(origin, dir))
     }
 
     #[inline]
@@ -137,14 +135,20 @@ impl<S, const D: usize> SimulationRay<S, D> {
     }
 }
 
-impl<S: SimdComplexField, const D: usize> SimulationRay<S, D> {
+impl<S: ComplexField, const D: usize> SimulationRay<S, D> {
+    #[inline]
+    #[must_use]
+    pub fn try_new(
+        origin: impl Into<SVector<S, D>>,
+        dir: impl Into<SVector<S, D>>,
+    ) -> Option<Self> {
+        Ray::try_new(origin, dir).map(Self::from_ray)
+    }
+
     #[inline]
     #[must_use]
     pub fn new(origin: impl Into<SVector<S, D>>, dir: impl Into<SVector<S, D>>) -> Self {
-        Self {
-            ray: Ray::new(origin, dir),
-            reflection_cap: None,
-        }
+        Self::from_ray(Ray::new(origin, dir))
     }
 }
 

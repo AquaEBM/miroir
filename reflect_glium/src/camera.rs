@@ -1,81 +1,37 @@
-use core::{f32::consts::FRAC_PI_2, time::Duration};
+use super::*;
 
-use cgmath::{Angle, Matrix4, Point3, Rad, Vector3};
+use core::{f32::consts::FRAC_PI_2, time::Duration};
 use glium::glutin::{
     dpi::PhysicalPosition,
     event::{ElementState, MouseScrollDelta, VirtualKeyCode},
 };
+use nalgebra::{Matrix4, Point3, Vector3};
 
 const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
 
 pub struct Camera {
-    pub position: Point3<f32>,
-    yaw: Rad<f32>,
-    pitch: Rad<f32>,
+    pos: Point3<f32>,
+    yaw: f32,
+    pitch: f32,
 }
 
 impl Camera {
-    pub fn new<V: Into<cgmath::Point3<f32>>, Y: Into<Rad<f32>>, P: Into<Rad<f32>>>(
-        position: V,
-        yaw: Y,
-        pitch: P,
-    ) -> Self {
+    pub fn new(position: impl Into<Point3<f32>>, yaw: f32, pitch: f32) -> Self {
         Self {
-            position: position.into(),
+            pos: position.into(),
             yaw: yaw.into(),
             pitch: pitch.into(),
         }
     }
 
     pub fn calc_matrix(&self) -> Matrix4<f32> {
-        let (sin_pitch, cos_pitch) = self.pitch.0.sin_cos();
-        let (sin_yaw, cos_yaw) = self.yaw.0.sin_cos();
+        let (sin_pitch, cos_pitch) = self.pitch.sin_cos();
+        let (sin_yaw, cos_yaw) = self.yaw.sin_cos();
 
-        let up = cgmath::Vector3::unit_y();
-        let target = cgmath::Vector3::new(cos_pitch * cos_yaw, sin_pitch, cos_pitch * sin_yaw);
+        let up = Vector3::y();
+        let target = Vector3::new(cos_pitch * cos_yaw, sin_pitch, cos_pitch * sin_yaw);
 
-        Matrix4::look_to_rh(
-            cgmath::Point3::new(self.position.x, self.position.y, self.position.z),
-            target,
-            up,
-        )
-    }
-}
-
-#[derive(Debug)]
-pub struct Projection {
-    aspect: f32,
-    fov_y: Rad<f32>,
-    z_near: f32,
-    z_far: f32,
-}
-
-impl Projection {
-    pub fn new<F: Into<Rad<f32>>>(
-        width: u32,
-        height: u32,
-        fov_y: F,
-        z_near: f32,
-        z_far: f32,
-    ) -> Self {
-        Self {
-            aspect: width as f32 / height as f32,
-            fov_y: fov_y.into(),
-            z_near,
-            z_far,
-        }
-    }
-
-    pub const fn aspect(&self) -> f32 {
-        self.aspect
-    }
-
-    pub fn resize(&mut self, width: u32, height: u32) {
-        self.aspect = width as f32 / height as f32;
-    }
-
-    pub fn get_matrix(&self) -> Matrix4<f32> {
-        cgmath::perspective(self.fov_y, self.aspect, self.z_near, self.z_far)
+        Matrix4::look_at_rh(&self.pos, &(self.pos + target), &up)
     }
 }
 
@@ -140,7 +96,7 @@ impl CameraController {
 
     pub fn set_mouse_delta(&mut self, mouse_dx: f64, mouse_dy: f64) {
         self.rotate_horizontal = mouse_dx as f32;
-        self.rotate_vertical = mouse_dy as f32;
+        self.rotate_vertical = -mouse_dy as f32;
     }
 
     pub fn set_scroll(&mut self, delta: &MouseScrollDelta) {
@@ -164,16 +120,17 @@ impl CameraController {
         let spd = self.speed * dt;
         let mouse_sens = self.mouse_sensitivity * dt;
 
-        camera.position += forward * (self.amount_forward - self.amount_backwards) * spd;
-        camera.position += right * (self.amount_right - self.amount_left) * spd;
+        camera.pos += forward * (self.amount_forward - self.amount_backwards) * spd;
+        camera.pos += right * (self.amount_right - self.amount_left) * spd;
 
-        camera.position += scrollward * self.scroll * spd;
+        camera.pos += scrollward * self.scroll * spd;
 
-        camera.position.y += (self.amount_up - self.amount_down) * spd;
+        camera.pos.y += (self.amount_up - self.amount_down) * spd;
 
-        camera.yaw += Rad(self.rotate_horizontal) * mouse_sens;
-        camera.pitch -= Rad(self.rotate_vertical) * mouse_sens;
-        camera.pitch = Rad(camera.pitch.0.clamp(-SAFE_FRAC_PI_2, SAFE_FRAC_PI_2));
+        camera.yaw += self.rotate_horizontal * mouse_sens;
+        camera.pitch += self.rotate_vertical * mouse_sens;
+
+        camera.pitch = camera.pitch.clamp(-SAFE_FRAC_PI_2, SAFE_FRAC_PI_2);
 
         self.scroll = 0.;
         self.rotate_horizontal = 0.;

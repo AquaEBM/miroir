@@ -74,13 +74,10 @@ impl<S: ComplexField, const D: usize> Sphere<S, D> {
 
 impl<S: ComplexField, const D: usize> Mirror<D> for Sphere<S, D> {
     type Scalar = S;
-    fn add_tangents(&self, ctx: &SimulationCtx<Self::Scalar, D>) {
-        if let Some(tangents) = self.tangents_at_intersections(ctx.ray) {
+    fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, D>) {
+        if let Some(tangents) = self.tangents_at_intersections(ctx.ray()) {
             for (d, n) in tangents {
-                ctx.add_tangent(Plane {
-                    intersection: PlaneOffset::DistanceToRay(d),
-                    direction: HyperPlane::Normal(n),
-                });
+                ctx.add_tangent(d, Hyperplane::Normal(n));
             }
         }
     }

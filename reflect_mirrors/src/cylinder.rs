@@ -115,12 +115,9 @@ impl<S: RealField> Cylinder<S> {
 
 impl<S: RealField> Mirror<3> for Cylinder<S> {
     type Scalar = S;
-    fn add_tangents(&self, ctx: &SimulationCtx<Self::Scalar, 3>) {
-        for (d, n) in self.tangents_at_intersections(ctx.ray) {
-            ctx.add_tangent(Plane {
-                intersection: PlaneOffset::DistanceToRay(d),
-                direction: HyperPlane::Normal(n),
-            });
+    fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, 3>) {
+        for (d, n) in self.tangents_at_intersections(ctx.ray()) {
+            ctx.add_tangent(d, Hyperplane::Normal(n));
         }
     }
 }

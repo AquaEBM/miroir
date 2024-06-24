@@ -9,9 +9,9 @@ use super::*;
 #[derive(Clone, Debug, PartialEq)]
 pub struct Simplex<S, const D: usize> {
     /// The plane this mirror belongs to, the unused first vector is used as the starting point
-    plane: HyperPlaneBasis<S, D>,
+    plane: HyperplaneBasis<S, D>,
     /// The same plane, but represented with an orthonormal basis, useful for orthogonal symmetries
-    orthonormalised: HyperPlaneBasisOrtho<S, D>,
+    orthonormalised: HyperplaneBasisOrtho<S, D>,
 }
 
 pub type Triangle<S> = Simplex<S, 3>;
@@ -25,7 +25,7 @@ impl<S: ComplexField, const D: usize> Simplex<S, D> {
 
         basis.iter_mut().for_each(|v| *v -= v0.clone());
 
-        HyperPlaneBasis::new(vectors).map(|(plane, orthonormalised)| Self {
+        HyperplaneBasis::try_new(vectors).map(|(plane, orthonormalised)| Self {
             plane,
             orthonormalised,
         })
@@ -39,8 +39,27 @@ impl<S: ComplexField, const D: usize> Simplex<S, D> {
 
 impl<S, const D: usize> Simplex<S, D> {
     #[inline]
-    pub const fn inner_plane(&self) -> &HyperPlaneBasis<S, D> {
+    #[must_use]
+    pub const fn inner_plane(&self) -> &HyperplaneBasis<S, D> {
         &self.plane
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn inner_plane_mut(&mut self) -> &mut HyperplaneBasis<S, D> {
+        &mut self.plane
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn inner_plane_ortho(&self) -> &HyperplaneBasisOrtho<S, D> {
+        &self.orthonormalised
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn inner_plane_ortho_mut(&mut self) -> &mut HyperplaneBasisOrtho<S, D> {
+        &mut self.orthonormalised
     }
 }
 
@@ -99,22 +118,16 @@ impl<S: RealField, const D: usize> Simplex<S, D> {
     pub fn tangent_at_intersection(
         &self,
         ray: &Ray<S, D>,
-    ) -> Option<(S, &HyperPlaneBasisOrtho<S, D>)> {
+    ) -> Option<(S, &HyperplaneBasisOrtho<S, D>)> {
         self.intersection(ray).map(|t| (t, &self.orthonormalised))
     }
 }
 
 impl<S: RealField, const D: usize> Mirror<D> for Simplex<S, D> {
     type Scalar = S;
-    fn add_tangents(&self, ctx: &SimulationCtx<Self::Scalar, D>) {
-        if let Some((t, direction)) = self.tangent_at_intersection(ctx.ray) {
-            ctx.add_tangent(Plane {
-                // We could return `Intersection::StartingPoint(self.plane.v0())`, but
-                // we already calculated `t`.
-                // We might as well save the simulation runner some work, and return that
-                intersection: PlaneOffset::DistanceToRay(t),
-                direction: HyperPlane::Plane(direction.clone()),
-            });
+    fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, D>) {
+        if let Some((t, direction)) = self.tangent_at_intersection(ctx.ray()) {
+            ctx.add_tangent(t, Hyperplane::Plane(direction.clone()));
         }
     }
 }

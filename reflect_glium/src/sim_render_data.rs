@@ -1,6 +1,11 @@
+use core::f32::consts::{FRAC_PI_2, PI};
+
 use super::*;
 
+use camera::{Camera, CameraController};
+
 use gl::index::{NoIndices, PrimitiveType};
+use nalgebra::{Perspective3, Point3};
 const LINE_STRIP: NoIndices = NoIndices(PrimitiveType::LineStrip);
 
 pub struct SimulationRenderData<const D: usize> {
@@ -147,14 +152,18 @@ where
             vertex_scratch.clear();
             pt_scratch.push(origin);
 
-            let mut path = RayPath::new(mirror, ray, params.epsilon.clone());
+            let mut path = RayPath {
+                mirror,
+                ray,
+                eps: params.epsilon.clone(),
+            };
 
             let path_iter = path.by_ref();
 
             let outcome = 'block: {
                 if let Some(n) = reflection_cap {
                     for pt in path_iter.take(n) {
-                        let out = loop_index(&pt_scratch, &pt, params.epsilon.clone());
+                        let out = loop_index(&pt_scratch, &pt, &params.epsilon);
                         if out.is_some() {
                             break 'block Some(out);
                         }
@@ -165,7 +174,7 @@ where
                     (pt_scratch.len() <= n).then_some(None)
                 } else {
                     for pt in path_iter {
-                        let out = loop_index(&pt_scratch, &pt, params.epsilon.clone());
+                        let out = loop_index(&pt_scratch, &pt, &params.epsilon);
                         if out.is_some() {
                             break 'block Some(out);
                         }
@@ -189,7 +198,7 @@ where
 
             if let Some(None) = outcome {
                 let last = *vertex_scratch.last().unwrap();
-                let dir = Vertex::from(path.current_ray().dir.clone().into_inner());
+                let dir = Vertex::from(path.ray.dir.clone().into_inner());
                 vertex_scratch.push(last + 20000. * dir);
             }
 
@@ -211,14 +220,14 @@ where
     }
 
     pub(crate) fn run(self, display: gl::Display, events_loop: glutin::event_loop::EventLoop<()>) {
-        const DEFAULT_CAMERA_POS: cg::Point3<f32> = cg::Point3::new(0., 0., 5.);
-        const DEFAULT_CAMERA_YAW: cg::Deg<f32> = cg::Deg(-90.);
-        const DEFAULT_CAMERA_PITCH: cg::Deg<f32> = cg::Deg(0.);
+        const DEFAULT_CAMERA_POS: Point3<f32> = Point3::new(0., 0., 0.);
+        const DEFAULT_CAMERA_YAW: f32 = -FRAC_PI_2;
+        const DEFAULT_CAMERA_PITCH: f32 = 0.;
         const SPEED: f32 = 5.;
         const MOUSE_SENSITIVITY: f32 = 1.0;
-        const DEFAULT_PROJECCTION_POV: cg::Deg<f32> = cg::Deg(85.);
-        const NEAR_PLANE: f32 = 0.0001;
-        const FAR_PLANE: f32 = 10000.;
+        const DEFAULT_PROJECTION_FOV: f32 = 85. / 180. * PI;
+        const NEAR_PLANE: f32 = 0.001;
+        const FAR_PLANE: f32 = 1000.;
 
         use glutin::{dpi, event, event_loop, window};
 
@@ -226,10 +235,9 @@ where
 
         let dpi::PhysicalSize { width, height } = display.gl_window().window().inner_size();
 
-        let mut projection = Projection::new(
-            width,
-            height,
-            DEFAULT_PROJECCTION_POV,
+        let mut projection = Perspective3::new(
+            width as f32 / height as f32,
+            DEFAULT_PROJECTION_FOV,
             NEAR_PLANE,
             FAR_PLANE,
         );
@@ -245,7 +253,8 @@ where
 
                 event::WindowEvent::Resized(physical_size) => {
                     if physical_size.width > 0 && physical_size.height > 0 {
-                        projection.resize(physical_size.width, physical_size.height);
+                        projection
+                            .set_aspect(physical_size.width as f32 / physical_size.height as f32);
                     }
 
                     display.gl_window().resize(physical_size);
@@ -325,7 +334,7 @@ where
         });
     }
 
-    fn render_3d(&self, display: &gl::Display, camera: &Camera, projection: &Projection) {
+    fn render_3d(&self, display: &gl::Display, camera: &Camera, projection: &Perspective3<f32>) {
         const RAY_LOOP_COL: [f32; 4] = [0.9, 0.2, 0.9, 1.0];
         const RAY_NON_LOOP_COL: [f32; 4] = [0.7, 0.7, 0.7, 0.9];
         let mirror_color = if D == 3 {
@@ -341,7 +350,7 @@ where
         use gl::Surface;
         target.clear_color_and_depth((0.01, 0.01, 0.05, 1.), 1.0);
 
-        let perspective: [[_; 4]; 4] = projection.get_matrix().into();
+        let perspective: [[_; 4]; 4] = projection.as_matrix().clone().into();
         let view: [[_; 4]; 4] = camera.calc_matrix().into();
 
         let aspect = projection.aspect();

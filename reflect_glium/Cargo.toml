@@ -12,9 +12,8 @@ reflect_mirrors = { path = "../reflect_mirrors" }
 glium = "0.32"
 
 impl-trait-for-tuples = "0.2"
-num-traits = "0.2"
+num-traits = { version = "0.2", default-features = false }
 
 # TODO: work on getting rid of these
 
 glium_shapes = { git = "https://github.com/FlashOnFire/glium_shapes.git", branch = "glium-0.32.2" }
-cgmath = "0.18"

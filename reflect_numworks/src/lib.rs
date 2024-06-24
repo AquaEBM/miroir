@@ -4,7 +4,7 @@ use core::ops::Deref;
 use eadk::kandinsky::*;
 use num_traits::{float::FloatCore, AsPrimitive};
 use reflect::{
-    nalgebra::{RealField, SVector, SimdComplexField, Unit},
+    nalgebra::{ComplexField, RealField, SVector, Unit},
     Mirror, Ray, RayPath,
 };
 
@@ -40,7 +40,17 @@ impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for reflect_mirrors::L
         let [start, end] = self.vertices();
         let [x0, y0] = start.into();
         let [x1, y1] = end.into();
-        draw_line(Point { x: x0.as_(), y: y0.as_() }, Point { x: x1.as_(), y: y1.as_() }, color)
+        draw_line(
+            Point {
+                x: x0.as_(),
+                y: y0.as_(),
+            },
+            Point {
+                x: x1.as_(),
+                y: y1.as_(),
+            },
+            color,
+        )
     }
 }
 
@@ -115,37 +125,32 @@ impl<const D: usize, S: PartialEq> PartialEq for SimulationRay<S, D> {
 }
 
 impl<S, const D: usize> SimulationRay<S, D> {
-    const DEFAULT_COLOR: Color = Color::from_rgb([255, 127, 0]);
+    const DEFAULT_COLOR: Color = Color::from_rgb([248, 180, 48]);
+
+    #[inline]
+    #[must_use]
+    pub const fn from_ray(ray: Ray<S, D>) -> Self {
+        Self {
+            ray,
+            reflection_cap: None,
+            color: Self::DEFAULT_COLOR,
+        }
+    }
+
     #[inline]
     #[must_use]
     pub fn new_unit_dir(origin: impl Into<SVector<S, D>>, dir: Unit<SVector<S, D>>) -> Self {
-        Self {
-            ray: Ray::new_unit_dir(origin, dir),
-            reflection_cap: None,
-            color: Self::DEFAULT_COLOR,
-        }
+        Self::from_ray(Ray::new_unit_dir(origin, dir))
     }
 
-    /// # Safety
-    ///
-    /// `dir` must be a unit vector, or very close to one
     #[inline]
     #[must_use]
-    pub unsafe fn new_unchecked_dir(
+    /// Does not normalize `dir`
+    pub fn new_unchecked_dir(
         origin: impl Into<SVector<S, D>>,
         dir: impl Into<SVector<S, D>>,
     ) -> Self {
-        Self {
-            ray: Ray::new_unchecked(origin, dir),
-            reflection_cap: None,
-            color: Self::DEFAULT_COLOR,
-        }
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn max_reflections(&self) -> Option<&usize> {
-        self.reflection_cap.as_ref()
+        Self::from_ray(Ray::new_unchecked_dir(origin, dir))
     }
 
     #[inline]
@@ -154,24 +159,35 @@ impl<S, const D: usize> SimulationRay<S, D> {
         self.reflection_cap = Some(max);
         self
     }
+
+    #[inline]
+    #[must_use]
+    pub fn with_color(mut self, color: Color) -> Self {
+        self.color = color;
+        self
+    }
 }
 
-impl<S: SimdComplexField, const D: usize> SimulationRay<S, D> {
+impl<S: ComplexField, const D: usize> SimulationRay<S, D> {
+    #[inline]
+    #[must_use]
+    pub fn try_new(
+        origin: impl Into<SVector<S, D>>,
+        dir: impl Into<SVector<S, D>>,
+    ) -> Option<Self> {
+        Ray::try_new(origin, dir).map(Self::from_ray)
+    }
+
     #[inline]
     #[must_use]
     pub fn new(origin: impl Into<SVector<S, D>>, dir: impl Into<SVector<S, D>>) -> Self {
-        Self {
-            ray: Ray::new(origin, dir),
-            reflection_cap: None,
-            color: Self::DEFAULT_COLOR,
-        }
+        Self::from_ray(Ray::new(origin, dir))
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SimulationParams<S> {
     pub epsilon: S,
-    pub detect_loops: bool,
     pub mirror_color: Color,
     pub step_time_ms: u32,
 }
@@ -183,7 +199,6 @@ where
     fn default() -> Self {
         Self {
             epsilon: S::epsilon() * 64.0.as_(),
-            detect_loops: false,
             mirror_color: Color::from_rgb([255, 0, 0]),
             step_time_ms: 0,
         }
@@ -207,13 +222,27 @@ pub fn run_simulation<M>(
     } in rays
     {
         let mut prev_pt = ray.origin;
-        let mut path = RayPath::new(mirror, ray, params.epsilon.clone());
+        let mut path = RayPath {
+            mirror,
+            ray,
+            eps: params.epsilon.clone(),
+        };
 
         let connect_line = |prev: &mut SVector<_, 2>, to: SVector<_, 2>| {
             let [x0, y0]: [M::Scalar; 2] = (*prev).into();
             *prev = to;
             let [x1, y1] = to.into();
-            draw_line(Point { x: x0.as_(), y: y0.as_() }, Point { x: x1.as_(), y: y1.as_() }, color);
+            draw_line(
+                Point {
+                    x: x0.as_(),
+                    y: y0.as_(),
+                },
+                Point {
+                    x: x1.as_(),
+                    y: y1.as_(),
+                },
+                color,
+            );
             eadk::time::sleep_ms(params.step_time_ms);
         };
 
@@ -232,7 +261,7 @@ pub fn run_simulation<M>(
         };
 
         if diverges {
-            let new_pt = prev_pt + path.current_ray().dir.as_ref() * 1000.0.as_();
+            let new_pt = prev_pt + path.ray.dir.as_ref() * 1000.0.as_();
             connect_line(&mut prev_pt, new_pt);
         }
     }

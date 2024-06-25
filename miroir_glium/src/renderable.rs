@@ -1,17 +1,17 @@
 use super::*;
 use core::{array, ops::AddAssign};
-use nalgebra::{Vector2, RealField};
+use nalgebra::{RealField, Vector2};
 
 /// A trait encompassing a shape that can be rendered
 ///
-/// Mirrors implementing [`OpenGLRenderable`] return objects for this trait enabling them to be rendered
+/// [`Mirror`]s implementing [`OpenGLRenderable`] return objects for this trait enabling them to be rendered
 /// on-screen in simulations.
 pub trait RenderData {
     fn vertices(&self) -> gl::vertex::VerticesSource;
     fn indices(&self) -> gl::index::IndicesSource;
 }
 
-// glium_shapes 3d convenience blanket impl
+/// glium_shapes 3Dconvenience blanket impl
 impl RenderData for glium_shapes::sphere::Sphere {
     fn vertices(&self) -> gl::vertex::VerticesSource {
         self.into()
@@ -23,8 +23,10 @@ impl RenderData for glium_shapes::sphere::Sphere {
 }
 
 /// A wrapper around a `Vec<T>` that only allows pushing/appending/extending etc...
-pub struct List<T>(Vec<T>);
+pub struct List<T>(pub(crate) Vec<T>);
 
+/// Most of these methods forward their implementation to the inner [`Vec`].
+/// Check the relevant documentation when needed.
 impl<T> List<T> {
     #[inline]
     pub fn into_inner(self) -> Vec<T> {
@@ -82,14 +84,7 @@ impl<T> Extend<T> for List<T> {
     }
 }
 
-impl<T> From<Vec<T>> for List<T> {
-    #[inline]
-    fn from(value: Vec<T>) -> Self {
-        Self(value)
-    }
-}
-
-#[impl_trait_for_tuples::impl_for_tuples(1, 16)]
+#[impl_trait_for_tuples::impl_for_tuples(16)]
 pub trait OpenGLRenderable {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>);
 }
@@ -109,7 +104,6 @@ impl<const N: usize, T: OpenGLRenderable> OpenGLRenderable for [T; N] {
 
 // It's clear that all these impls use the `Deref` trait, but writing a blanket impl over all
 // types implementing `Deref` makes the trait unusable downstream
-
 impl<T: OpenGLRenderable + ?Sized> OpenGLRenderable for Box<T> {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         self.deref().append_render_data(display, list);
@@ -145,8 +139,6 @@ impl<'a, T: OpenGLRenderable + ?Sized> OpenGLRenderable for &'a mut T {
         self.deref().append_render_data(display, list);
     }
 }
-
-// TODO: implement for all `RealField`s
 
 // Use glium_shapes::sphere::Sphere for the 3D implementation
 impl<S: RealField + AsPrimitive<f32>> OpenGLRenderable for miroir_shapes::Sphere<S, 3> {
@@ -199,7 +191,7 @@ impl RenderData for Circle {
     }
 }
 
-// in 2d, the list of vertices of a circle is easy to calculate
+// in 2D, the list of vertices of a circle is easy to calculate
 impl<S: RealField + AsPrimitive<f32>> OpenGLRenderable for miroir_shapes::Sphere<S, 2> {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         list.push(Box::new(Circle::new::<360>(
@@ -243,6 +235,7 @@ where
         }))
     }
 }
+
 struct CylinderRenderData {
     vertices: gl::VertexBuffer<Vertex3D>,
 }

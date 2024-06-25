@@ -3,13 +3,11 @@
 
 use core::panic::PanicInfo;
 
-use miroir_shapes::{LineSegment, Sphere};
 use miroir_numworks::{
     eadk::{ion::*, kandinsky::*},
-    SimulationParams,
-    SimulationRay,
-    run_simulation
+    run_simulation, SimulationParams, SimulationRay,
 };
+use miroir_shapes::{LineSegment, Sphere};
 
 #[used]
 #[link_section = ".rodata.eadk_app_name"]

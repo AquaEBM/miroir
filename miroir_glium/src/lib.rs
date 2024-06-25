@@ -15,8 +15,8 @@ use gl::glutin;
 use gl::backend::glutin::DisplayCreationError;
 
 use glutin::{dpi, event_loop, window};
-use nalgebra::{ComplexField, RealField, SVector, Scalar, Unit};
 use miroir::*;
+use nalgebra::{ComplexField, RealField, SVector, Scalar, Unit};
 
 mod camera;
 mod renderable;
@@ -25,14 +25,17 @@ mod sim_render_data;
 pub use renderable::*;
 use sim_render_data::SimulationRenderData;
 
+/// The main vertex type used when rendering simulations,
+/// You are free to use whichever vertex type you wish, as long as their dimensions
+/// correctly match those of the simulation .
 #[derive(Copy, Clone, Debug)]
 pub struct Vertex<const N: usize> {
-    pub pos: [f32; N],
+    pub position: [f32; N],
 }
 
 impl<const D: usize> Default for Vertex<D> {
     fn default() -> Self {
-        Self { pos: [0.; D] }
+        Self { position: [0.; D] }
     }
 }
 
@@ -41,7 +44,7 @@ impl<const D: usize> Add for Vertex<D> {
 
     fn add(self, rhs: Self) -> Self::Output {
         Self {
-            pos: array::from_fn(|i| self.pos[i] + rhs.pos[i]),
+            position: array::from_fn(|i| self.position[i] + rhs.position[i]),
         }
     }
 }
@@ -51,7 +54,7 @@ impl<const D: usize> Mul<f32> for Vertex<D> {
 
     fn mul(self, s: f32) -> Self::Output {
         Self {
-            pos: self.pos.map(|c| c * s),
+            position: self.position.map(|c| c * s),
         }
     }
 }
@@ -61,16 +64,16 @@ impl<const D: usize> Mul<Vertex<D>> for f32 {
 
     fn mul(self, rhs: Vertex<D>) -> Self::Output {
         Vertex {
-            pos: rhs.pos.map(|c| c * self),
+            position: rhs.position.map(|c| c * self),
         }
     }
 }
 
 pub type Vertex2D = Vertex<2>;
-gl::implement_vertex!(Vertex2D, pos);
+gl::implement_vertex!(Vertex2D, position);
 
 pub type Vertex3D = Vertex<3>;
-gl::implement_vertex!(Vertex3D, pos);
+gl::implement_vertex!(Vertex3D, position);
 
 impl<S, const D: usize> From<SVector<S, D>> for Vertex<D>
 where
@@ -78,14 +81,19 @@ where
 {
     fn from(v: SVector<S, D>) -> Self {
         Self {
-            pos: v.map(AsPrimitive::as_).into(),
+            position: v.map(AsPrimitive::as_).into(),
         }
     }
 }
 
+/// A wrapper around a [`Ray`](miroir::Ray) that contains extra data required by the simulation
+/// visualizer/runner
 #[derive(Debug, Clone)]
 pub struct SimulationRay<S, const D: usize> {
+    /// They ray used in the simulation.
     pub ray: Ray<S, D>,
+    /// The maximum amount of reflections this ray will do. If this is `Some(n)` the ray
+    /// will perform at most `n` reflections.
     pub reflection_cap: Option<usize>,
 }
 
@@ -152,9 +160,15 @@ impl<S: ComplexField, const D: usize> SimulationRay<S, D> {
     }
 }
 
+/// A set of global parameters for a simulation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SimulationParams<S> {
+    /// See [`Ray::closest_intersection`] for more info on the role of this field.
+    ///
+    /// Will also be used as the comparison epsilon when detecting loops.
     pub epsilon: S,
+    /// Whether to detect if the ray's path ends up in an infinite loop,
+    /// and halt the simulation accordingly. Default: `false`
     pub detect_loops: bool,
 }
 
@@ -170,6 +184,7 @@ where
     }
 }
 
+/// A handle for the window used to visualize simulations.
 pub struct SimulationWindow {
     events_loop: glutin::event_loop::EventLoop<()>,
     display: gl::Display,
@@ -177,6 +192,8 @@ pub struct SimulationWindow {
 
 impl SimulationWindow {
     #[inline]
+    /// Create a new window to visualize simulations in from a `winit`
+    /// [`WindowBuilder`](window::WindowBuilder) and a [`glutin::ContextBuilder`].
     pub fn new<T: glutin::ContextCurrentState>(
         wb: window::WindowBuilder,
         cb: glutin::ContextBuilder<T>,
@@ -215,7 +232,7 @@ impl Default for SimulationWindow {
         Self::new(
             window::WindowBuilder::new()
                 .with_inner_size(dpi::LogicalSize::new(1280, 720))
-                .with_title("Reflect"),
+                .with_title("Miroir"),
             glutin::ContextBuilder::new()
                 .with_vsync(true)
                 .with_multisampling(1 << 4),

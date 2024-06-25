@@ -2,11 +2,11 @@
 
 use core::ops::Deref;
 use eadk::kandinsky::*;
-use num_traits::{float::FloatCore, AsPrimitive};
 use miroir::{
     nalgebra::{ComplexField, RealField, SVector, Unit},
     Mirror, Ray, RayPath,
 };
+use num_traits::{float::FloatCore, AsPrimitive};
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -15,6 +15,7 @@ use alloc::{boxed::Box, rc::Rc, sync::Arc, vec::Vec};
 
 pub use eadk;
 
+/// A trait enabling [`Mirror`]s to be drawn on your Numworks Calculator's screen.
 #[impl_trait_for_tuples::impl_for_tuples(16)]
 pub trait KandinskyRenderable {
     fn draw(&self, color: Color);
@@ -31,7 +32,7 @@ impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for miroir_shapes::Sph
             },
             self.radius().clone().as_().unsigned_abs(),
             color,
-        )
+        );
     }
 }
 
@@ -50,14 +51,14 @@ impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for miroir_shapes::Lin
                 y: y1.as_(),
             },
             color,
-        )
+        );
     }
 }
 
 impl<T: KandinskyRenderable> KandinskyRenderable for [T] {
     fn draw(&self, color: Color) {
         for mirror in self {
-            mirror.draw(color)
+            mirror.draw(color);
         }
     }
 }
@@ -111,16 +112,25 @@ impl<'a, T: KandinskyRenderable + ?Sized> KandinskyRenderable for &'a mut T {
     }
 }
 
+/// A wrapper around a [`Ray`](miroir::Ray) that contains extra data required by the simulation
+/// visualizer/runner
 #[derive(Debug, Clone)]
 pub struct SimulationRay<S, const D: usize> {
+    /// They ray used in the simulation.
     pub ray: Ray<S, D>,
+    /// The maximum amount of reflections this ray will do. If this is `Some(n)` the ray
+    /// will perform at most `n` reflections. Default: `None`
     pub reflection_cap: Option<usize>,
+    /// Color of the lines drawn on screen representing the ray's path.
+    /// Default: [`Self::DEFAULT_COLOR`]
     pub color: Color,
 }
 
 impl<const D: usize, S: PartialEq> PartialEq for SimulationRay<S, D> {
     fn eq(&self, other: &Self) -> bool {
-        self.ray == other.ray && self.reflection_cap == other.reflection_cap
+        self.ray == other.ray
+            && self.reflection_cap == other.reflection_cap
+            && self.color == other.color
     }
 }
 
@@ -185,10 +195,17 @@ impl<S: ComplexField, const D: usize> SimulationRay<S, D> {
     }
 }
 
+/// A set of global parameters for a simulation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SimulationParams<S> {
+    /// See [`Ray::closest_intersection`] for more info on the role of this field.
+    ///
+    /// Will also be used as the comparison epsilon when detecting loops.
     pub epsilon: S,
+    /// The [`Color`] passed to [`KandinskyRenderable::draw`] when requesting the mirrors
+    /// to be drawn.
     pub mirror_color: Color,
+    /// A pause time between each reflection, useful for easily viewing the ray's path.
     pub step_time_ms: u32,
 }
 
@@ -255,7 +272,7 @@ pub fn run_simulation<M>(
             count < n
         } else {
             for pt in path.by_ref() {
-                connect_line(&mut prev_pt, pt)
+                connect_line(&mut prev_pt, pt);
             }
             true
         };

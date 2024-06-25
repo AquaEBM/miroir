@@ -5,5 +5,5 @@ edition = "2021"
 
 [dependencies]
 
-miroir = { path = "../miroir", default-features = false }
+miroir = { path = "../miroir_core", default-features = false }
 arrayvec = { version = "0.7", default-features = false }

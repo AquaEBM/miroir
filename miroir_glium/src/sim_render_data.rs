@@ -73,24 +73,24 @@ const STARTING_POINT_GEOMETRY_SHADER_SRC: &str = r"
 const VERTEX_SHADER_2D_SRC: &str = r"
     #version 140
 
-    in vec2 pos;
+    in vec2 position;
     uniform mat4 perspective;
     uniform mat4 view;
 
     void main() {
-        gl_Position = perspective * view * vec4(pos, 0.0, 1.0);
+        gl_Position = perspective * view * vec4(position, 0.0, 1.0);
     }
 ";
 
 const VERTEX_SHADER_3D_SRC: &str = r"
     #version 140
 
-    in vec3 pos;
+    in vec3 position;
     uniform mat4 perspective;
     uniform mat4 view;
 
     void main() {
-        gl_Position = perspective * view * vec4(pos, 1.0);
+        gl_Position = perspective * view * vec4(position, 1.0);
     }
 ";
 
@@ -129,7 +129,7 @@ where
         )
         .unwrap();
 
-        let mut mirrors = List::from(vec![]);
+        let mut mirrors = List(vec![]);
 
         mirror.append_render_data(display, &mut mirrors);
 

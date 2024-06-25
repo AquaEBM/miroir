@@ -6,7 +6,7 @@ edition = "2021"
 
 [dependencies]
 
-miroir = { path = "../miroir" }
+miroir = { path = "../miroir_core" }
 miroir_shapes = { path = "../miroir_shapes" }
 
 glium = "0.32"

@@ -240,7 +240,6 @@ impl<S: PartialEq, const D: usize> PartialEq for Ray<S, D> {
 }
 
 impl<S: ComplexField, const D: usize> Ray<S, D> {
-
     /// # Panics
     ///
     /// If `dir` is the zero vector.
@@ -270,15 +269,15 @@ impl<S: ComplexField, const D: usize> Ray<S, D> {
     /// It is possible that [`ray.at(t)`](Self::at) lands slightly beyond `mirror`, due to roundoff errors,
     /// making the `ray` bump, roughly, into `P` again, in it's next reflection, sometimes
     /// resulting in it traveling "through" `mirror`, when it should "move away" from it.
-    /// 
+    ///
     /// To mitigate this, one can require `ray` to travel a certain, usually very small, strictly
     /// positive, distance (`eps`) before being reflected again, discarding intersections whose
     /// distance to `ray` is less than `eps`, hopefully avoiding the previous point in it's path.
-    /// 
+    ///
     /// `eps` must be large enough to accomodate the precision errors of `S`
     /// (lower values are more acceptable for `f64` than for `f32`) but small enough
     /// to make sure `ray` doesn't ignore an intersection it shouldn't.
-    /// 
+    ///
     /// Note that, actually, `eps.abs()` will be used, preventing `ray` from traveling
     /// "negative" distances. An `eps` of zero is generally useless, and often results
     /// in incorrect results. The behaviour for `eps = NAN` or `inf` is unspecified, but, usually,

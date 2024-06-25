@@ -1,9 +1,9 @@
 [package]
-name = "reflect_mirrors"
+name = "miroir_shapes"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 
-reflect = { path = "../reflect", default-features = false }
+miroir = { path = "../miroir", default-features = false }
 arrayvec = { version = "0.7", default-features = false }

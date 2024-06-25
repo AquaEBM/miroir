@@ -15,7 +15,7 @@ use nalgebra::{zero, ComplexField, SMatrix, SVector, SimdComplexField, Unit};
 
 /// A hyperplane, stored as a basis of `D-1` vectors
 ///
-/// `D` must be non-zero
+/// `D` must be non-zero, or unexpected panics could happen.
 #[derive(Clone, Debug, PartialEq)]
 pub struct HyperplaneBasis<S, const D: usize> {
     /// See [`Self::try_new`] for info on the layout of this field.
@@ -45,14 +45,14 @@ impl<S: ComplexField, const D: usize> HyperplaneBasis<S, D> {
     }
 
     /// Returns a vector `[t_1, ..., t_d]` whose coordinates represent
-    /// the `intersection` of the given `ray` and the affine hyperplane
-    /// starting at `v0` whose direction space is `self`.
+    /// the `intersection` between `ray` and the affine hyperplane
+    /// starting at `v0`, and directed by `self`.
     ///
     /// If it exists, the following holds:
     ///
     /// `intersection = ray.origin + t_1 * ray.direction` and,
     ///
-    /// let `[v_2, ..., v_d]` be the basis of `self`'s direction space (returned by `self.basis()`)
+    /// let `[v_2, ..., v_d]` be the basis of `self` (returned by `self.basis()`)
     ///
     /// `interserction = plane.origin + sum for k in [2 ; n] t_k * v_k`
     #[inline]
@@ -82,7 +82,7 @@ impl<S, const D: usize> HyperplaneBasis<S, D> {
     ///
     /// # Panics
     ///
-    /// if `D` == 0
+    /// if `D == 0`
     #[inline]
     #[must_use]
     pub const fn v0(&self) -> &SVector<S, D> {
@@ -94,7 +94,7 @@ impl<S, const D: usize> HyperplaneBasis<S, D> {
     ///
     /// # Panics
     ///
-    /// if `D` == 0
+    /// if `D == 0`
     #[inline]
     pub fn v0_mut(&mut self) -> &mut SVector<S, D> {
         &mut self.vectors[0]
@@ -106,7 +106,7 @@ impl<S, const D: usize> HyperplaneBasis<S, D> {
     ///
     /// # Panics
     ///
-    /// if `D` == 0
+    /// if `D == 0`
     #[inline]
     #[must_use]
     pub fn basis(&self) -> &[SVector<S, D>] {
@@ -120,10 +120,10 @@ impl<S, const D: usize> HyperplaneBasis<S, D> {
     }
 }
 
-/// A hyperplane, like [`HyperPlaneBasis`], but the basis stored is garanteed
+/// A hyperplane, like [`HyperplaneBasis`], but the basis stored is garanteed
 /// to be orthonormal, efficiently enabling projections and symmetries.
 ///
-/// `D` must be non-zero
+/// `D` must be non-zero, or unexpected panics could happen
 #[derive(Clone, Debug, PartialEq)]
 pub struct HyperplaneBasisOrtho<S, const D: usize> {
     /// See [`HyperPlaneBasis::new`] for info on the layout of this field
@@ -144,7 +144,7 @@ impl<S, const D: usize> HyperplaneBasisOrtho<S, D> {
     ///
     /// # Panics
     ///
-    /// if `D` == 0
+    /// if `D == 0`
     pub fn v0_mut(&mut self) -> &mut SVector<S, D> {
         self.plane.v0_mut()
     }
@@ -158,8 +158,8 @@ impl<S: SimdComplexField, const D: usize> HyperplaneBasisOrtho<S, D> {
         self.basis().iter().map(|e| e * v.dot(e)).sum()
     }
 
-    /// Returns the point with the smallest distance to the affine
-    /// hyperplane stating at `v0`, and directed by `self`.
+    /// Returns the point in the affine hyperplane starting at `v0`, and directed by `self`,
+    /// with the smallest distance to `v0`.
     #[inline]
     #[must_use]
     pub fn closest_point_to_plane(&self, v0: &SVector<S, D>, p: &SVector<S, D>) -> SVector<S, D> {
@@ -239,6 +239,63 @@ impl<S: PartialEq, const D: usize> PartialEq for Ray<S, D> {
     }
 }
 
+impl<S: ComplexField, const D: usize> Ray<S, D> {
+
+    /// # Panics
+    ///
+    /// If `dir` is the zero vector.
+    #[inline]
+    #[must_use]
+    pub fn new(origin: impl Into<SVector<S, D>>, dir: impl Into<SVector<S, D>>) -> Self {
+        Self::try_new(origin, dir).expect("direction must be non-zero")
+    }
+
+    /// Returns `None` if `dir` is the zero vector.
+    #[inline]
+    #[must_use]
+    pub fn try_new(
+        origin: impl Into<SVector<S, D>>,
+        dir: impl Into<SVector<S, D>>,
+    ) -> Option<Self> {
+        Unit::try_new(dir.into(), zero()).map(|unit| Self {
+            origin: origin.into(),
+            dir: unit,
+        })
+    }
+
+    /// Returns the smallest (positive) `t` such that `P :=`[`self.at(t)`](Self::at)
+    /// (approximately) intersects with `mirror`, and the direction space
+    /// of the tangent to `mirror` at `P`, if any.
+    ///
+    /// It is possible that [`ray.at(t)`](Self::at) lands slightly beyond `mirror`, due to roundoff errors,
+    /// making the `ray` bump, roughly, into `P` again, in it's next reflection, sometimes
+    /// resulting in it traveling "through" `mirror`, when it should "move away" from it.
+    /// 
+    /// To mitigate this, one can require `ray` to travel a certain, usually very small, strictly
+    /// positive, distance (`eps`) before being reflected again, discarding intersections whose
+    /// distance to `ray` is less than `eps`, hopefully avoiding the previous point in it's path.
+    /// 
+    /// `eps` must be large enough to accomodate the precision errors of `S`
+    /// (lower values are more acceptable for `f64` than for `f32`) but small enough
+    /// to make sure `ray` doesn't ignore an intersection it shouldn't.
+    /// 
+    /// Note that, actually, `eps.abs()` will be used, preventing `ray` from traveling
+    /// "negative" distances. An `eps` of zero is generally useless, and often results
+    /// in incorrect results. The behaviour for `eps = NAN` or `inf` is unspecified, but, usually,
+    /// it results in a return value of `None` regardless of `mirror`.
+    #[inline]
+    #[must_use]
+    pub fn closest_intersection(
+        &self,
+        mirror: &(impl Mirror<D, Scalar = S> + ?Sized),
+        eps: S::RealField,
+    ) -> Option<(S, Hyperplane<S, D>)> {
+        let mut ctx = SimulationCtx::new(self, eps);
+        mirror.add_tangents(&mut ctx);
+        ctx.reset_closest()
+    }
+}
+
 impl<S, const D: usize> Ray<S, D> {
     #[inline]
     #[must_use]
@@ -288,45 +345,6 @@ impl<S: SimdComplexField, const D: usize> Ray<S, D> {
     #[must_use]
     pub fn at(&self, t: S) -> SVector<S, D> {
         &self.origin + self.dir.as_ref() * t
-    }
-}
-
-impl<S: ComplexField, const D: usize> Ray<S, D> {
-    /// Returns `None` if `dir` is the zero vector.\
-    #[inline]
-    #[must_use]
-    pub fn try_new(
-        origin: impl Into<SVector<S, D>>,
-        dir: impl Into<SVector<S, D>>,
-    ) -> Option<Self> {
-        Unit::try_new(dir.into(), zero()).map(|unit| Self {
-            origin: origin.into(),
-            dir: unit,
-        })
-    }
-
-    /// # Panics
-    ///
-    /// When `dir` is the zero vector.
-    #[inline]
-    #[must_use]
-    pub fn new(origin: impl Into<SVector<S, D>>, dir: impl Into<SVector<S, D>>) -> Self {
-        Self::try_new(origin, dir).expect("direction must be non-zero")
-    }
-
-    /// Returns the smallest (positive) `t` such that `P :=`[`self.at(t)`](Self::at)
-    /// (approximately) intersects with `mirror`, and if it exists,
-    /// the direction of the tangent to `mirror` at `P`.
-    #[inline]
-    #[must_use]
-    pub fn closest_intersection(
-        &self,
-        mirror: &(impl Mirror<D, Scalar = S> + ?Sized),
-        eps: S::RealField,
-    ) -> Option<(S, Hyperplane<S, D>)> {
-        let mut ctx = SimulationCtx::new(self, eps);
-        mirror.add_tangents(&mut ctx);
-        ctx.reset_closest()
     }
 }
 
@@ -408,7 +426,7 @@ pub trait Mirror<const D: usize> {
     ///
     /// This method is deterministic, i. e. for every valid `ray`, it always has
     /// the same behavior for that `ray`, regardless of internal/global state.
-    /// This means that implementors of this trait are advised to not use `static`s,
+    /// Implementors of this trait are advised to not use `static`s,
     /// interior mutability, time, RNGs etc...
     fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, D>);
 }
@@ -416,13 +434,13 @@ pub trait Mirror<const D: usize> {
 use impl_trait_for_tuples::impl_for_tuples;
 
 #[impl_for_tuples(1, 16)]
-impl<S: ComplexField, const D: usize> Mirror<D> for Tuple {
-    for_tuples!( where #( Tuple: Mirror<D, Scalar = S> )* );
+impl<S: ComplexField, const D: usize> Mirror<D> for T {
+    for_tuples!( where #( T: Mirror<D, Scalar = S> )* );
     type Scalar = S;
 
     #[inline]
     fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, D>) {
-        for_tuples!( #( Tuple.add_tangents(ctx); )* );
+        for_tuples!( #( T.add_tangents(ctx); )* );
     }
 }
 

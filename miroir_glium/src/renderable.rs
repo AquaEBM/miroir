@@ -1,7 +1,6 @@
 use super::*;
 use core::{array, ops::AddAssign};
-use na::Vector2;
-use nalgebra::RealField;
+use nalgebra::{Vector2, RealField};
 
 /// A trait encompassing a shape that can be rendered
 ///
@@ -150,7 +149,7 @@ impl<'a, T: OpenGLRenderable + ?Sized> OpenGLRenderable for &'a mut T {
 // TODO: implement for all `RealField`s
 
 // Use glium_shapes::sphere::Sphere for the 3D implementation
-impl<S: RealField + AsPrimitive<f32>> OpenGLRenderable for reflect_mirrors::Sphere<S, 3> {
+impl<S: RealField + AsPrimitive<f32>> OpenGLRenderable for miroir_shapes::Sphere<S, 3> {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         let r = self.radius().as_();
         let [x, y, z] = self.center.map(|s| s.as_()).into();
@@ -201,7 +200,7 @@ impl RenderData for Circle {
 }
 
 // in 2d, the list of vertices of a circle is easy to calculate
-impl<S: RealField + AsPrimitive<f32>> OpenGLRenderable for reflect_mirrors::Sphere<S, 2> {
+impl<S: RealField + AsPrimitive<f32>> OpenGLRenderable for miroir_shapes::Sphere<S, 2> {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         list.push(Box::new(Circle::new::<360>(
             self.center.map(|s| s.as_()).into(),
@@ -231,7 +230,7 @@ impl<const D: usize> RenderData for SimplexRenderData<D> {
     }
 }
 
-impl<S, const D: usize> OpenGLRenderable for reflect_mirrors::Simplex<S, D>
+impl<S, const D: usize> OpenGLRenderable for miroir_shapes::Simplex<S, D>
 where
     Vertex<D>: gl::Vertex + From<SVector<S, D>>,
     SVector<S, D>: AddAssign + Clone,
@@ -260,7 +259,7 @@ impl RenderData for CylinderRenderData {
     }
 }
 
-impl<S: RealField + AsPrimitive<f32>> OpenGLRenderable for reflect_mirrors::Cylinder<S> {
+impl<S: RealField + AsPrimitive<f32>> OpenGLRenderable for miroir_shapes::Cylinder<S> {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         const NUM_POINTS: usize = 360;
 

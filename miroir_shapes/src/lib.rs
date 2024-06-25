@@ -8,6 +8,6 @@ pub use cylinder::*;
 pub use simplex::*;
 pub use sphere::*;
 
-use reflect::*;
+use miroir::*;
 
 use nalgebra::{SVector, Unit};

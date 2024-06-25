@@ -1,13 +1,13 @@
 [package]
 
-name = "reflect_glium"
+name = "miroir_glium"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 
-reflect = { path = "../reflect" }
-reflect_mirrors = { path = "../reflect_mirrors" }
+miroir = { path = "../miroir" }
+miroir_shapes = { path = "../miroir_shapes" }
 
 glium = "0.32"
 

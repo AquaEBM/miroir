@@ -15,8 +15,8 @@ use gl::glutin;
 use gl::backend::glutin::DisplayCreationError;
 
 use glutin::{dpi, event_loop, window};
-use nalgebra::{self as na, ComplexField, RealField, SVector, Scalar, Unit};
-use reflect::*;
+use nalgebra::{ComplexField, RealField, SVector, Scalar, Unit};
+use miroir::*;
 
 mod camera;
 mod renderable;
@@ -72,11 +72,11 @@ gl::implement_vertex!(Vertex2D, pos);
 pub type Vertex3D = Vertex<3>;
 gl::implement_vertex!(Vertex3D, pos);
 
-impl<S, const D: usize> From<na::SVector<S, D>> for Vertex<D>
+impl<S, const D: usize> From<SVector<S, D>> for Vertex<D>
 where
     S: Scalar + AsPrimitive<f32>,
 {
-    fn from(v: na::SVector<S, D>) -> Self {
+    fn from(v: SVector<S, D>) -> Self {
         Self {
             pos: v.map(AsPrimitive::as_).into(),
         }

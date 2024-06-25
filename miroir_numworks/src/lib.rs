@@ -3,7 +3,7 @@
 use core::ops::Deref;
 use eadk::kandinsky::*;
 use num_traits::{float::FloatCore, AsPrimitive};
-use reflect::{
+use miroir::{
     nalgebra::{ComplexField, RealField, SVector, Unit},
     Mirror, Ray, RayPath,
 };
@@ -20,7 +20,7 @@ pub trait KandinskyRenderable {
     fn draw(&self, color: Color);
 }
 
-impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for reflect_mirrors::Sphere<S, 2> {
+impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for miroir_shapes::Sphere<S, 2> {
     fn draw(&self, color: Color) {
         let [x, y] = self.center.into();
 
@@ -35,7 +35,7 @@ impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for reflect_mirrors::S
     }
 }
 
-impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for reflect_mirrors::LineSegment<S> {
+impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for miroir_shapes::LineSegment<S> {
     fn draw(&self, color: Color) {
         let [start, end] = self.vertices();
         let [x0, y0] = start.into();
@@ -125,7 +125,7 @@ impl<const D: usize, S: PartialEq> PartialEq for SimulationRay<S, D> {
 }
 
 impl<S, const D: usize> SimulationRay<S, D> {
-    const DEFAULT_COLOR: Color = Color::from_rgb([248, 180, 48]);
+    pub const DEFAULT_COLOR: Color = Color::from_rgb([248, 180, 48]);
 
     #[inline]
     #[must_use]

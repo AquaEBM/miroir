@@ -1,16 +1,16 @@
 [package]
 
-name = "reflect_numworks"
+name = "miroir_numworks"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 
 impl-trait-for-tuples = "0.2"
-reflect = { path = "../reflect", default-features = false, features = ["libm"] }
-reflect_mirrors = { path = "../reflect_mirrors" }
+miroir = { path = "../miroir", default-features = false, features = ["libm"] }
+miroir_shapes = { path = "../miroir_shapes" }
 num-traits = { version = "0.2", default-features = false }
 eadk = { git = "https://github.com/AquaEBM/eadk_rs" }
 
 [features]
-alloc = ["reflect/alloc"]
+alloc = ["miroir/alloc"]

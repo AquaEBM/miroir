@@ -1,10 +1,10 @@
 [workspace]
 
 members = [
-    "reflect",
-    "reflect_glium",
-    "reflect_mirrors",
-    "reflect_numworks",
+    "miroir",
+    "miroir_glium",
+    "miroir_shapes",
+    "miroir_numworks",
 ]
 
 resolver = "2"

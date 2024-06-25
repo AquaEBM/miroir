@@ -14,6 +14,8 @@ extern crate alloc;
 use alloc::{boxed::Box, rc::Rc, sync::Arc, vec::Vec};
 
 pub use eadk;
+pub use miroir;
+pub use miroir_shapes;
 
 /// A trait enabling [`Mirror`]s to be drawn on your Numworks Calculator's screen.
 #[impl_trait_for_tuples::impl_for_tuples(16)]

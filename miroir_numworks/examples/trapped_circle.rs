@@ -3,10 +3,12 @@
 
 use core::panic::PanicInfo;
 
-use reflect_mirrors::{LineSegment, Sphere};
-use reflect_numworks::{
+use miroir_shapes::{LineSegment, Sphere};
+use miroir_numworks::{
     eadk::{ion::*, kandinsky::*},
-    SimulationParams, SimulationRay,
+    SimulationParams,
+    SimulationRay,
+    run_simulation
 };
 
 #[used]
@@ -75,7 +77,7 @@ fn main() {
 
     let rays = [SimulationRay::new([10., 50.], [2., 1.]).with_reflection_cap(200)];
 
-    reflect_numworks::run_simulation(
+    run_simulation(
         &mirrors,
         rays,
         SimulationParams {

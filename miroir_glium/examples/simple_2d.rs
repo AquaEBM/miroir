@@ -1,5 +1,5 @@
-use reflect_glium::{SimulationParams, SimulationRay, SimulationWindow};
-use reflect_mirrors::LineSegment;
+use miroir_glium::{SimulationParams, SimulationRay, SimulationWindow};
+use miroir_shapes::LineSegment;
 
 fn main() {
     let mirrors = [

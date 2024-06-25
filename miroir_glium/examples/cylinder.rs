@@ -1,5 +1,5 @@
-use reflect_glium::{SimulationParams, SimulationRay, SimulationWindow};
-use reflect_mirrors::Cylinder;
+use miroir_glium::{SimulationParams, SimulationRay, SimulationWindow};
+use miroir_shapes::Cylinder;
 
 fn main() {
     let mirror = Cylinder::new([0., 0., 0.], [10., 0., 0.], 2.);

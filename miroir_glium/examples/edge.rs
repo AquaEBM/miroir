@@ -1,5 +1,5 @@
-use reflect_glium::{SimulationParams, SimulationRay, SimulationWindow};
-use reflect_mirrors::Simplex;
+use miroir_glium::{SimulationParams, SimulationRay, SimulationWindow};
+use miroir_shapes::Simplex;
 
 fn main() {
     let mirror = Simplex::new([[1., 0.000001], [1., 1.]]);

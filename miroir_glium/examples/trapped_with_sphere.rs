@@ -1,5 +1,5 @@
-use reflect_glium::{SimulationParams, SimulationRay, SimulationWindow};
-use reflect_mirrors::{Sphere, Triangle};
+use miroir_glium::{SimulationParams, SimulationRay, SimulationWindow};
+use miroir_shapes::{Sphere, Triangle};
 
 fn main() {
     let max = std::env::args()

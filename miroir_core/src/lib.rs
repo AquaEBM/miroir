@@ -223,12 +223,12 @@ impl<S: SimdComplexField, const D: usize> Hyperplane<S, D> {
     }
 }
 
-/// A ray, represented as a half-line
+/// A ray, represented as a line
 #[derive(Clone, Debug)]
 pub struct Ray<S, const D: usize> {
-    /// The starting point of the half-line
+    /// The starting point of the line
     pub origin: SVector<S, D>,
-    /// the direction of the half-line
+    /// the direction of the line
     pub dir: Unit<SVector<S, D>>,
 }
 
@@ -275,13 +275,13 @@ impl<S: ComplexField, const D: usize> Ray<S, D> {
     /// distance to `ray` is less than `eps`, hopefully avoiding the previous point in it's path.
     ///
     /// `eps` must be large enough to accomodate the precision errors of `S`
-    /// (lower values are more acceptable for `f64` than for `f32`) but small enough
+    /// (e. g. lower values are more acceptable for `f64` than for `f32`) but small enough
     /// to make sure `ray` doesn't ignore an intersection it shouldn't.
     ///
     /// Note that, actually, `eps.abs()` will be used, preventing `ray` from traveling
-    /// "negative" distances. An `eps` of zero is generally useless, and often results
+    /// "negative" distances. An `eps` of `0` is generally useless, and often results
     /// in incorrect results. The behaviour for `eps = NAN` or `inf` is unspecified, but, usually,
-    /// it results in a return value of `None` regardless of `mirror`.
+    /// results in a return value of `None` regardless of anything else.
     #[inline]
     #[must_use]
     pub fn closest_intersection(

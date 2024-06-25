@@ -258,16 +258,13 @@ where
                     }
 
                     display.gl_window().resize(physical_size);
-                }
-                event::WindowEvent::MouseWheel { delta, .. } => {
-                    camera_controller.set_scroll(&delta);
-                }
+                },
 
                 event::WindowEvent::KeyboardInput { input, .. } => {
                     if let Some(keycode) = input.virtual_keycode {
                         camera_controller.process_keyboard(keycode, input.state);
                     }
-                }
+                },
 
                 event::WindowEvent::MouseInput { button, state, .. } => {
                     if button == event::MouseButton::Left {
@@ -300,7 +297,7 @@ where
                             }
                         }
                     }
-                }
+                },
                 _ => {}
             },
             event::Event::RedrawRequested(_) => {

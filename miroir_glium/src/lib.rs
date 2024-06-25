@@ -7,9 +7,6 @@ use alloc::{boxed::Box, collections::TryReserveError, rc::Rc, sync::Arc, vec::Ve
 use num_traits::{float::FloatCore, AsPrimitive};
 use std::time;
 
-pub use glium as gl;
-pub use glium_shapes as gl_shapes;
-
 use gl::glutin;
 
 use gl::backend::glutin::DisplayCreationError;
@@ -24,6 +21,11 @@ mod sim_render_data;
 
 pub use renderable::*;
 use sim_render_data::SimulationRenderData;
+
+pub use miroir;
+pub use miroir_shapes;
+pub use glium as gl;
+pub use glium_shapes as gl_shapes;
 
 /// The main vertex type used when rendering simulations,
 /// You are free to use whichever vertex type you wish, as long as their dimensions

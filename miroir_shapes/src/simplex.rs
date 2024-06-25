@@ -18,6 +18,13 @@ pub type Triangle<S> = Simplex<S, 3>;
 pub type LineSegment<S> = Simplex<S, 2>;
 
 impl<S: ComplexField, const D: usize> Simplex<S, D> {
+    /// Attempts to create a `D-1`-simplex in using an array of `D` affinely independent points.
+    /// 
+    /// Returns `None` if they are affinely dependent.
+    /// 
+    /// # Panics
+    /// 
+    /// if `D == 0`
     #[inline]
     pub fn try_new(points: [impl Into<SVector<S, D>>; D]) -> Option<Self> {
         let mut vectors: [SVector<_, D>; D] = points.map(Into::into);
@@ -31,6 +38,11 @@ impl<S: ComplexField, const D: usize> Simplex<S, D> {
         })
     }
 
+    /// A panicking version of [`Self::try_new`]
+    /// 
+    /// # Panics
+    /// 
+    /// if `D == 0` or, the points in `points` are affinely dependent
     #[inline]
     pub fn new(points: [impl Into<SVector<S, D>>; D]) -> Self {
         Self::try_new(points).unwrap()
@@ -44,6 +56,12 @@ impl<S, const D: usize> Simplex<S, D> {
         &self.plane
     }
 
+    /// It is worth noting that translating the `v0` vector of the returned value:
+    /// ```ignore
+    /// *self.inner_plane_mut().v0_mut() += v;
+    /// ```
+    /// 
+    /// Effectively translates this whole simplex.
     #[inline]
     #[must_use]
     pub fn inner_plane_mut(&mut self) -> &mut HyperplaneBasis<S, D> {
@@ -54,12 +72,6 @@ impl<S, const D: usize> Simplex<S, D> {
     #[must_use]
     pub const fn inner_plane_ortho(&self) -> &HyperplaneBasisOrtho<S, D> {
         &self.orthonormalised
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn inner_plane_ortho_mut(&mut self) -> &mut HyperplaneBasisOrtho<S, D> {
-        &mut self.orthonormalised
     }
 }
 
@@ -79,6 +91,11 @@ impl<S, const D: usize> Simplex<S, D>
 where
     SVector<S, D>: AddAssign + Clone,
 {
+    /// Returns the vertices of this simplex
+    /// 
+    /// # Panics
+    /// 
+    /// if `D == 0`
     #[inline]
     pub fn vertices(&self) -> [SVector<S, D>; D] {
         let mut vertices = self.inner_plane().vectors_raw().clone();
@@ -90,6 +107,7 @@ where
 }
 
 impl<S: RealField, const D: usize> Simplex<S, D> {
+    /// Returns the distance `d` such that [`ray.at(d)`](Ray::at) intersects with `self`
     #[inline]
     pub fn intersection(&self, ray: &Ray<S, D>) -> Option<S> {
         let p = self.inner_plane();
@@ -113,21 +131,13 @@ impl<S: RealField, const D: usize> Simplex<S, D> {
             Some(distance.clone())
         })
     }
-
-    #[inline]
-    pub fn tangent_at_intersection(
-        &self,
-        ray: &Ray<S, D>,
-    ) -> Option<(S, &HyperplaneBasisOrtho<S, D>)> {
-        self.intersection(ray).map(|t| (t, &self.orthonormalised))
-    }
 }
 
 impl<S: RealField, const D: usize> Mirror<D> for Simplex<S, D> {
     type Scalar = S;
     fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, D>) {
-        if let Some((t, direction)) = self.tangent_at_intersection(ctx.ray()) {
-            ctx.add_tangent(t, Hyperplane::Plane(direction.clone()));
+        if let Some(t) = self.intersection(ctx.ray()) {
+            ctx.add_tangent(t, Hyperplane::Plane(self.inner_plane_ortho().clone()));
         }
     }
 }

@@ -66,6 +66,10 @@ impl<S: RealField> Cylinder<S> {
         self.radius_sq = radius.clone() * radius;
     }
 
+    /// Returns up to two pairs `(d, n)` (`d` may be negative),
+    /// such that `P := `[`ray.at(t)`](Ray::at) instersects with `self`,
+    /// and `n` is the normal vector to the direction space of the tangent
+    /// to `self` at `P`, facing outwards of the cylinder.
     #[inline]
     #[must_use]
     pub fn tangents_at_intersections(

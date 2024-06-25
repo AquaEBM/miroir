@@ -1,10 +1,7 @@
 use super::*;
 
 use core::{f32::consts::FRAC_PI_2, time::Duration};
-use glium::glutin::{
-    dpi::PhysicalPosition,
-    event::{ElementState, MouseScrollDelta, VirtualKeyCode},
-};
+use glium::glutin::event::{ElementState, VirtualKeyCode};
 use nalgebra::{Matrix4, Point3, Vector3};
 
 const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
@@ -45,7 +42,6 @@ pub struct CameraController {
     amount_down: f32,
     rotate_horizontal: f32,
     rotate_vertical: f32,
-    scroll: f32,
     speed: f32,
     mouse_sensitivity: f32,
 }
@@ -61,7 +57,6 @@ impl CameraController {
             amount_down: 0.,
             rotate_horizontal: 0.,
             rotate_vertical: 0.,
-            scroll: 0.,
             speed,
             mouse_sensitivity,
         }
@@ -99,32 +94,19 @@ impl CameraController {
         self.rotate_vertical = -mouse_dy as f32;
     }
 
-    pub fn set_scroll(&mut self, delta: &MouseScrollDelta) {
-        self.scroll = -match delta {
-            MouseScrollDelta::LineDelta(_, scroll) => scroll * 100.,
-            MouseScrollDelta::PixelDelta(PhysicalPosition { y: scroll, .. }) => *scroll as f32,
-        }
-    }
-
     pub fn update_camera(&mut self, camera: &mut Camera, dt: Duration) {
         let dt = dt.as_secs_f32();
 
         let (yaw_sin, yaw_cos) = camera.yaw.sin_cos();
-        let (pitch_sin, pitch_cos) = camera.pitch.sin_cos();
 
-        // sin^2 + cos^2 = 1, these vectors are already normalized
         let forward = Vector3::new(yaw_cos, 0., yaw_sin);
         let right = Vector3::new(-yaw_sin, 0., yaw_cos);
-        let scrollward = Vector3::new(pitch_cos * yaw_cos, pitch_sin, pitch_cos * yaw_sin);
 
         let spd = self.speed * dt;
         let mouse_sens = self.mouse_sensitivity * dt;
 
         camera.pos += forward * (self.amount_forward - self.amount_backwards) * spd;
         camera.pos += right * (self.amount_right - self.amount_left) * spd;
-
-        camera.pos += scrollward * self.scroll * spd;
-
         camera.pos.y += (self.amount_up - self.amount_down) * spd;
 
         camera.yaw += self.rotate_horizontal * mouse_sens;
@@ -132,7 +114,6 @@ impl CameraController {
 
         camera.pitch = camera.pitch.clamp(-SAFE_FRAC_PI_2, SAFE_FRAC_PI_2);
 
-        self.scroll = 0.;
         self.rotate_horizontal = 0.;
         self.rotate_vertical = 0.;
     }

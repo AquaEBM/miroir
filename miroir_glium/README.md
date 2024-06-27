@@ -12,6 +12,14 @@ cargo run -r --example <example_name>
 
 Where `<example_name>` is the name of the example's source file, without the trailing `.rs`.
 
+Here are screenshots of some of the examples' visualisations:
+
+`trapped_in_sphere.rs`
+![trapped_in_sphere](https://github.com/AquaEBM/miroir/assets/79016373/53693e8c-993f-4919-979e-5c4ca0931ded)
+
+`cynlinder.rs`
+![image](https://github.com/AquaEBM/miroir/assets/79016373/05abbd0d-7268-4bbe-af7b-b9e195bab3bc)
+
 ## Controls
 
 - Use the WASD keys (or ZQSD) to move forward, left, backward, and right, respectively.
@@ -40,7 +48,7 @@ To include this crate as a dependency in your project, just add it to the `[depe
 miroir_glium = { git = "https://github.com/AquaEBM/miroir" }
 ```
 
-This crate already re-exports [`miroir`](../miroir_core), [`miroir_shapes`](../miroir_shapes) and [`glium`](https://crates.io/crates/glium/) for convenience, and to avoid dependency synchronisation issues.
+This crate already re-exports [`miroir`](../miroir_core) and [`glium`](https://crates.io/crates/glium/) for convenience, and to avoid dependency synchronisation issues.
 
 ### TODOs
 

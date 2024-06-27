@@ -400,11 +400,7 @@ impl<'a, S: ComplexField, const D: usize> SimulationCtx<'a, S, D> {
 /// The dimension parameter, `D`, defines the dimension of the space it
 /// exists in (and thus, the size of the vectors used for it's calulcations).
 ///
-/// Some mirrors, exist and are easy to implement in all dimensions. Hence why they implement
-/// [`Mirror<D>`] for all (non-zero) `D`. Others can only be implemented in _some_ dimensions,
-/// like 2, or 3.
-///
-/// `D` is expected to be non-zero. The behavior is unspecified it `D = 0`.
+/// `D` is expected to be non-zero. The behavior is unspecified (unexpected panics) if `D == 0`.
 ///
 /// `D` could have been an associated constant, the same way `Scalar` is an associated type,
 /// but, lack of `#[feature(generic_const_exprs)]` makes this difficult.
@@ -423,10 +419,13 @@ pub trait Mirror<const D: usize> {
     /// making them "behind" the ray's origin, (`ray.at(t)` where `t < 0.0`), these will be
     /// properly discarded.
     ///
-    /// This method is deterministic, i. e. for every valid `ray`, it always has
-    /// the same behavior for that `ray`, regardless of internal/global state.
-    /// Implementors of this trait are advised to not use `static`s,
-    /// interior mutability, time, RNGs etc...
+    /// This method is expected to be deterministic with respect to the ray,
+    /// i. e. for every valid `ray`, calling this method any number of times, at any time,
+    /// (without modifying `self` in between) should result in the exact same plane(s) being
+    /// reported to `ctx`, regardless of any internal/external state. Effectively making this
+    /// method behave like a mathemiatical function. Thus implementors of this trait are advised
+    /// to not make this method read/mutate any state that can have an effect on the planes
+    /// reported to `ctx`, or their number.
     fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, D>);
 }
 
@@ -529,12 +528,12 @@ impl<'a, const D: usize, M: Mirror<D> + ?Sized> Iterator for RayPath<'a, D, M> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let ray = &mut self.ray;
-        ray.closest_intersection(self.mirror, self.eps.clone())
-            .map(|(dist, direction)| {
-                ray.advance(dist);
-                ray.reflect_dir(&direction);
-                ray.origin.clone()
-            })
+        #[rustfmt::skip]
+        return ray.closest_intersection(self.mirror, self.eps.clone()).map(|(dist, direction)| {
+            ray.advance(dist);
+            ray.reflect_dir_optimised(&direction);
+            ray.origin.clone()
+        });
     }
 }
 

@@ -2,7 +2,7 @@
 
 Library extending [`miroir`](../miroir_core) with some rudimentary shapes you can easily use in simulations.
 
-To include this crate as a dependency in your project, just add it to the [`dependencies`] section of your `Cargo.toml` file.
+To include this crate as a dependency in your project, just add it to the `[dependencies]` section of your `Cargo.toml` file.
 
 ```toml
 # ...

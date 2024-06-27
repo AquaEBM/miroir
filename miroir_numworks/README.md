@@ -16,7 +16,7 @@ Where `<example_name>` is the name of the example's source file, without the tra
 
 Then, check out the last step in the instructions in [`eadk_rs`](https://github.com/AquaEBM/eadk_rs) to upload the binary to your calculator.
 
-Note that, the since this crate is part of a workspace, the `target` folder will be at the root of the repository.
+Note that, since this crate is part of a workspace, the `target` folder will be at the root of the whole repository.
 
 ## Documentation
 
@@ -26,7 +26,7 @@ For more information on how to use this crate, check out the docs:
 cargo doc --no-deps --open
 ```
 
-To include this crate as a dependency in your project, just add it to the [`dependencies`] section of your `Cargo.toml` file.
+To include this crate as a dependency in your project, just add it to the `[dependencies]` section of your `Cargo.toml` file.
 
 ```toml
 # ...

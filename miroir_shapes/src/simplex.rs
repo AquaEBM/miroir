@@ -19,11 +19,11 @@ pub type LineSegment<S> = Simplex<S, 2>;
 
 impl<S: ComplexField, const D: usize> Simplex<S, D> {
     /// Attempts to create a `D-1`-simplex in using an array of `D` affinely independent points.
-    /// 
+    ///
     /// Returns `None` if they are affinely dependent.
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// if `D == 0`
     #[inline]
     pub fn try_new(points: [impl Into<SVector<S, D>>; D]) -> Option<Self> {
@@ -39,9 +39,9 @@ impl<S: ComplexField, const D: usize> Simplex<S, D> {
     }
 
     /// A panicking version of [`Self::try_new`]
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// if `D == 0` or, the points in `points` are affinely dependent
     #[inline]
     pub fn new(points: [impl Into<SVector<S, D>>; D]) -> Self {
@@ -60,7 +60,7 @@ impl<S, const D: usize> Simplex<S, D> {
     /// ```ignore
     /// *self.inner_plane_mut().v0_mut() += v;
     /// ```
-    /// 
+    ///
     /// Effectively translates this whole simplex.
     #[inline]
     #[must_use]
@@ -92,9 +92,9 @@ where
     SVector<S, D>: AddAssign + Clone,
 {
     /// Returns the vertices of this simplex
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// if `D == 0`
     #[inline]
     pub fn vertices(&self) -> [SVector<S, D>; D] {

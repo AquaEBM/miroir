@@ -30,7 +30,7 @@ For more information on how to use this crate, check out the docs:
 cargo doc --no-deps --open
 ```
 
-To include this crate as a dependency in your project, just add it to the [`dependencies`] section of your `Cargo.toml` file.
+To include this crate as a dependency in your project, just add it to the `[dependencies]` section of your `Cargo.toml` file.
 
 ```toml
 # ...

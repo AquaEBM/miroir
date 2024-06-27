@@ -528,12 +528,12 @@ impl<'a, const D: usize, M: Mirror<D> + ?Sized> Iterator for RayPath<'a, D, M> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let ray = &mut self.ray;
-        #[rustfmt::skip]
-        return ray.closest_intersection(self.mirror, self.eps.clone()).map(|(dist, direction)| {
-            ray.advance(dist);
-            ray.reflect_dir_optimised(&direction);
-            ray.origin.clone()
-        });
+        ray.closest_intersection(self.mirror, self.eps.clone())
+            .map(|(dist, direction)| {
+                ray.advance(dist);
+                ray.reflect_dir(&direction);
+                ray.origin.clone()
+            })
     }
 }
 

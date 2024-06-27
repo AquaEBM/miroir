@@ -14,10 +14,10 @@ Where `<example_name>` is the name of the example's source file, without the tra
 
 Here are screenshots of some of the examples' visualisations:
 
-`trapped_in_sphere.rs`
+[`trapped_with_sphere.rs`](examples/trapped_with_sphere.rs)
 ![trapped_in_sphere](https://github.com/AquaEBM/miroir/assets/79016373/53693e8c-993f-4919-979e-5c4ca0931ded)
 
-`cynlinder.rs`
+[`cynlinder.rs`](examples/cylinder.rs)
 ![image](https://github.com/AquaEBM/miroir/assets/79016373/05abbd0d-7268-4bbe-af7b-b9e195bab3bc)
 
 ## Controls
@@ -48,7 +48,7 @@ To include this crate as a dependency in your project, just add it to the `[depe
 miroir_glium = { git = "https://github.com/AquaEBM/miroir" }
 ```
 
-This crate already re-exports [`miroir`](../miroir_core) and [`glium`](https://crates.io/crates/glium/) for convenience, and to avoid dependency synchronisation issues.
+This crate already re-exports [`glium`](https://crates.io/crates/glium/) for convenience, and to avoid dependency synchronisation issues.
 
 ### TODOs
 

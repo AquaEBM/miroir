@@ -14,8 +14,6 @@ extern crate alloc;
 use alloc::{boxed::Box, rc::Rc, sync::Arc, vec::Vec};
 
 pub use eadk;
-pub use miroir;
-pub use miroir_shapes;
 
 /// A trait enabling [`Mirror`]s to be drawn on your Numworks Calculator's screen.
 #[impl_trait_for_tuples::impl_for_tuples(16)]
@@ -267,14 +265,14 @@ pub fn run_simulation<M>(
 
         let diverges = if let Some(n) = reflection_cap {
             let mut count = 0;
-            for pt in path.by_ref().take(n) {
-                connect_line(&mut prev_pt, pt);
+            for Ray { origin, .. } in path.by_ref().take(n) {
+                connect_line(&mut prev_pt, origin);
                 count += 1;
             }
             count < n
         } else {
-            for pt in path.by_ref() {
-                connect_line(&mut prev_pt, pt);
+            for Ray { origin, .. } in path.by_ref() {
+                connect_line(&mut prev_pt, origin);
             }
             true
         };

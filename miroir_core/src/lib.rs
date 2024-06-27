@@ -404,6 +404,10 @@ impl<'a, S: ComplexField, const D: usize> SimulationCtx<'a, S, D> {
 ///
 /// `D` could have been an associated constant, the same way `Scalar` is an associated type,
 /// but, lack of `#[feature(generic_const_exprs)]` makes this difficult.
+// TODO: should we forgo const generics for `typenum` or `generic_array` to implement this?
+// I am leaning towards yes, since a future version of this trait will be generic
+// over the type used as hyperplane for the tangents, implementing this without
+// typenum would make things very clunky.
 pub trait Mirror<const D: usize> {
     type Scalar: ComplexField;
     /// Adds the tangents to this mirror, at the points of intersection
@@ -523,7 +527,7 @@ pub struct RayPath<'a, const D: usize, M: Mirror<D> + ?Sized> {
 }
 
 impl<'a, const D: usize, M: Mirror<D> + ?Sized> Iterator for RayPath<'a, D, M> {
-    type Item = SVector<M::Scalar, D>;
+    type Item = Ray<M::Scalar, D>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -532,7 +536,7 @@ impl<'a, const D: usize, M: Mirror<D> + ?Sized> Iterator for RayPath<'a, D, M> {
             .map(|(dist, direction)| {
                 ray.advance(dist);
                 ray.reflect_dir(&direction);
-                ray.origin.clone()
+                ray.clone()
             })
     }
 }

@@ -9,7 +9,7 @@ Examples of simulations you can run (and how to create them) can be found in the
 First, build the app with the following command:
 
 ```shell
-cargo build -r --example <example_name> --target=thumbv7em-none-eabihf
+cargo rustc build -r --example <example_name> --target=thumbv7em-none-eabihf -- -Clink-arg=--relocatable -Clink-arg=-no-gc-sections
 ```
 
 Where `<example_name>` is the name of the example's source file, without the trailing `.rs`.

@@ -22,7 +22,6 @@ use sim_render_data::SimulationRenderData;
 pub use renderable::*;
 pub use glium as gl;
 pub use glium_shapes as gl_shapes;
-pub use miroir;
 
 /// The main vertex type used when rendering simulations,
 /// You are free to use whichever vertex type you wish, as long as their dimensions

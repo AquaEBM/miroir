@@ -145,12 +145,10 @@ where
             reflection_cap,
         } in rays
         {
-            let origin = ray.origin.clone();
-
-            ray_origins.push(Vertex::from(origin.clone()));
+            ray_origins.push(Vertex::from(ray.origin.clone()));
 
             vertex_scratch.clear();
-            pt_scratch.push(origin);
+            pt_scratch.push(ray.origin.clone());
 
             let mut path = RayPath {
                 mirror,
@@ -162,24 +160,24 @@ where
 
             let outcome = 'block: {
                 if let Some(n) = reflection_cap {
-                    for pt in path_iter.take(n) {
-                        let out = loop_index(&pt_scratch, &pt, &params.epsilon);
+                    for Ray { origin, .. } in path_iter.take(n) {
+                        let out = loop_index(&pt_scratch, &origin, &params.epsilon);
                         if out.is_some() {
                             break 'block Some(out);
                         }
 
-                        pt_scratch.push(pt);
+                        pt_scratch.push(origin);
                     }
 
                     (pt_scratch.len() <= n).then_some(None)
                 } else {
-                    for pt in path_iter {
-                        let out = loop_index(&pt_scratch, &pt, &params.epsilon);
+                    for Ray { origin, .. } in path_iter {
+                        let out = loop_index(&pt_scratch, &origin, &params.epsilon);
                         if out.is_some() {
                             break 'block Some(out);
                         }
 
-                        pt_scratch.push(pt);
+                        pt_scratch.push(origin);
                     }
 
                     Some(None)

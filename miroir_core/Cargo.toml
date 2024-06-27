@@ -10,7 +10,7 @@ impl-trait-for-tuples = "0.2"
 
 [features]
 
-default = ["alloc", "std"]
+default = ["std"]
 alloc = ["nalgebra/alloc"]
 libm = ["nalgebra/libm"]
-std = ["nalgebra/std"]
+std = ["nalgebra/std", "alloc"]

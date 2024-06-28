@@ -18,6 +18,11 @@ Then, check out the last step in the instructions in [`eadk_rs`](https://github.
 
 Note that, since this crate is part of a workspace, the `target` folder will be at the root of the whole repository.
 
+Here are some videos of some simulations being run on the calculator:
+
+[`trapped_circle.rs`](examples/trapped_circle.rs) (Slowed down, with a timing parameter, for visibility)
+https://github.com/AquaEBM/miroir/assets/79016373/e7fd62c3-1bdd-4d6c-a17b-de3517f60b39
+
 ## Documentation
 
 For more information on how to use this crate, check out the docs:

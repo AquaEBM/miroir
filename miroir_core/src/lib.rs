@@ -96,6 +96,7 @@ impl<S, const D: usize> HyperplaneBasis<S, D> {
     ///
     /// if `D == 0`
     #[inline]
+    #[must_use]
     pub fn v0_mut(&mut self) -> &mut SVector<S, D> {
         &mut self.vectors[0]
     }
@@ -110,7 +111,7 @@ impl<S, const D: usize> HyperplaneBasis<S, D> {
     #[inline]
     #[must_use]
     pub fn basis(&self) -> &[SVector<S, D>] {
-        self.vectors.split_first().unwrap().1
+        &self.vectors[1..]
     }
 
     #[inline]
@@ -121,7 +122,7 @@ impl<S, const D: usize> HyperplaneBasis<S, D> {
 }
 
 /// A hyperplane, like [`HyperplaneBasis`], but the basis stored is garanteed
-/// to be orthonormal, efficiently enabling projections and symmetries.
+/// to be (approximately) orthonormal, efficiently enabling projections and symmetries.
 ///
 /// `D` must be non-zero, or unexpected panics could happen
 #[derive(Clone, Debug, PartialEq)]
@@ -133,6 +134,7 @@ pub struct HyperplaneBasisOrtho<S, const D: usize> {
 impl<S, const D: usize> Deref for HyperplaneBasisOrtho<S, D> {
     type Target = HyperplaneBasis<S, D>;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.plane
     }
@@ -159,7 +161,7 @@ impl<S: SimdComplexField, const D: usize> HyperplaneBasisOrtho<S, D> {
     }
 
     /// Returns the point in the affine hyperplane starting at `v0`, and directed by `self`,
-    /// with the smallest distance to `v0`.
+    /// with the smallest distance to `p`.
     #[inline]
     #[must_use]
     pub fn closest_point_to_plane(&self, v0: &SVector<S, D>, p: &SVector<S, D>) -> SVector<S, D> {
@@ -249,7 +251,7 @@ impl<S: ComplexField, const D: usize> Ray<S, D> {
         Self::try_new(origin, dir).expect("direction must be non-zero")
     }
 
-    /// Returns `None` if `dir` is the zero vector.
+    /// Returns [`None`](None) if `dir` is the zero vector.
     #[inline]
     #[must_use]
     pub fn try_new(

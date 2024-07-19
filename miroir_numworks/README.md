@@ -14,9 +14,7 @@ cargo rustc build -r --example <example_name> --target=thumbv7em-none-eabihf -- 
 
 Where `<example_name>` is the name of the example's source file, without the trailing `.rs`.
 
-Then, check out the last step in the instructions in [`eadk_rs`](https://github.com/AquaEBM/eadk_rs) to upload the binary to your calculator.
-
-Note that, since this crate is part of a workspace, the `target` folder will be at the root of the whole repository.
+Then, check out the last step in the instructions in [`eadk_rs`](https://github.com/AquaEBM/eadk_rs) to upload the binary to your calculator (Note that, since this crate is part of a workspace, the `target` folder will be at the root of the whole repository).
 
 Here are some videos of some simulations being run on the calculator:
 

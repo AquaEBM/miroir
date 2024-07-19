@@ -229,11 +229,11 @@ impl Default for SimulationWindow {
     fn default() -> Self {
         Self::new(
             window::WindowBuilder::new()
-                .with_inner_size(dpi::LogicalSize::new(1280, 720))
+                .with_inner_size(dpi::LogicalSize::new(1067, 600))
                 .with_title("Miroir"),
             glutin::ContextBuilder::new()
                 .with_vsync(true)
-                .with_multisampling(1 << 4),
+                .with_multisampling(1 << 3)
         )
         .expect("failed to build display")
     }

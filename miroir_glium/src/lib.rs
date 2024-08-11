@@ -19,9 +19,9 @@ mod sim_render_data;
 
 use sim_render_data::SimulationRenderData;
 
-pub use renderable::*;
 pub use glium as gl;
 pub use glium_shapes as gl_shapes;
+pub use renderable::*;
 
 /// The main vertex type used when rendering simulations,
 /// You are free to use whichever vertex type you wish, as long as their dimensions
@@ -233,7 +233,7 @@ impl Default for SimulationWindow {
                 .with_title("Miroir"),
             glutin::ContextBuilder::new()
                 .with_vsync(true)
-                .with_multisampling(1 << 3)
+                .with_multisampling(1 << 3),
         )
         .expect("failed to build display")
     }

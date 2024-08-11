@@ -8,7 +8,7 @@ fn main() {
         .unwrap_or(300);
 
     const SPHERE_RADIUS: f32 = 4.;
-    const CUBE_DIMS: [f32 ; 3] = [10., 10., 10.];
+    const CUBE_DIMS: [f32; 3] = [10., 10., 10.];
 
     let [x, y, z] = CUBE_DIMS.map(|c| c.abs() / 2.);
 

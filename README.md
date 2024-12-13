@@ -1,6 +1,6 @@
 # `miroir`
 
-A minimal yet powerful set of libraries for simulating ray reflection on arbitrary, user-defined shapes (or differentiable manifolds, for the math-savvy), in Rust.
+A minimal yet powerful set of libraries for simulating ray reflection on arbitrary, user-defined shapes (curves in 2D, surfaces in 3D, etc...), in Rust.
 
 Requires the latest stable version of the [Rust Compiler](https://www.rust-lang.org/tools/install).
 

@@ -3,10 +3,11 @@
 use core::ops::Deref;
 use eadk::kandinsky::*;
 use miroir::{
-    nalgebra::{ComplexField, RealField, SVector, Unit},
-    Mirror, Ray, RayPath,
+    either::Either,
+    nalgebra::{RealField, SVector},
+    Hyperplane, Mirror, Ray, Scalar, VMulAdd,
 };
-use num_traits::{float::FloatCore, AsPrimitive};
+use num_traits::AsPrimitive;
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -14,6 +15,21 @@ extern crate alloc;
 use alloc::{boxed::Box, rc::Rc, sync::Arc, vec::Vec};
 
 pub use eadk;
+pub use miroir;
+
+pub trait ToPoint {
+    fn to_point(&self) -> Point;
+}
+
+impl<S: miroir::nalgebra::Scalar + AsPrimitive<i16>> ToPoint for SVector<S, 2> {
+    fn to_point(&self) -> Point {
+        let [x, y] = (*self).into();
+        Point {
+            x: x.as_(),
+            y: y.as_(),
+        }
+    }
+}
 
 /// A trait enabling [`Mirror`]s to be drawn on your Numworks Calculator's screen.
 #[impl_trait_for_tuples::impl_for_tuples(16)]
@@ -23,14 +39,9 @@ pub trait KandinskyRenderable {
 
 impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for miroir_shapes::Sphere<S, 2> {
     fn draw(&self, color: Color) {
-        let [x, y] = self.center.into();
-
         draw_circle(
-            Point {
-                x: x.as_(),
-                y: y.as_(),
-            },
-            self.radius().clone().as_().unsigned_abs(),
+            self.center.to_point(),
+            self.radius().as_().unsigned_abs(),
             color,
         );
     }
@@ -39,19 +50,16 @@ impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for miroir_shapes::Sph
 impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for miroir_shapes::LineSegment<S> {
     fn draw(&self, color: Color) {
         let [start, end] = self.vertices();
-        let [x0, y0] = start.into();
-        let [x1, y1] = end.into();
-        draw_line(
-            Point {
-                x: x0.as_(),
-                y: y0.as_(),
-            },
-            Point {
-                x: x1.as_(),
-                y: y1.as_(),
-            },
-            color,
-        );
+        draw_line(start.to_point(), end.to_point(), color);
+    }
+}
+
+impl<T: KandinskyRenderable, U: KandinskyRenderable> KandinskyRenderable for Either<T, U> {
+    fn draw(&self, color: Color) {
+        match self {
+            Either::Left(m) => m.draw(color),
+            Either::Right(m) => m.draw(color),
+        }
     }
 }
 
@@ -100,186 +108,101 @@ impl<T: KandinskyRenderable> KandinskyRenderable for Vec<T> {
     }
 }
 
-impl<'a, T: KandinskyRenderable + ?Sized> KandinskyRenderable for &'a T {
+impl<T: KandinskyRenderable + ?Sized> KandinskyRenderable for &T {
     fn draw(&self, color: Color) {
         (*self).draw(color);
     }
 }
 
-impl<'a, T: KandinskyRenderable + ?Sized> KandinskyRenderable for &'a mut T {
+impl<T: KandinskyRenderable + ?Sized> KandinskyRenderable for &mut T {
     fn draw(&self, color: Color) {
         self.deref().draw(color);
     }
 }
 
-/// A wrapper around a [`Ray`](miroir::Ray) that contains extra data required by the simulation
-/// visualizer/runner
-#[derive(Debug, Clone)]
-pub struct SimulationRay<S, const D: usize> {
-    /// They ray used in the simulation.
-    pub ray: Ray<S, D>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct RayParams<S> {
+    /// See [`Ray::closest_intersection`] for more info on the role of this field.
+    ///
+    /// Will also be used as the comparison epsilon when detecting loops.
+    pub eps: S,
+    /// A pause time between each reflection, useful for easily viewing the ray's path.
+    pub step_time_ms: u32,
     /// The maximum amount of reflections this ray will do. If this is `Some(n)` the ray
     /// will perform at most `n` reflections. Default: `None`
     pub reflection_cap: Option<usize>,
     /// Color of the lines drawn on screen representing the ray's path.
-    /// Default: [`Self::DEFAULT_COLOR`]
     pub color: Color,
 }
 
-impl<const D: usize, S: PartialEq> PartialEq for SimulationRay<S, D> {
-    fn eq(&self, other: &Self) -> bool {
-        self.ray == other.ray
-            && self.reflection_cap == other.reflection_cap
-            && self.color == other.color
-    }
-}
-
-impl<S, const D: usize> SimulationRay<S, D> {
-    pub const DEFAULT_COLOR: Color = Color::from_rgb([248, 180, 48]);
-
-    #[inline]
-    #[must_use]
-    pub const fn from_ray(ray: Ray<S, D>) -> Self {
-        Self {
-            ray,
-            reflection_cap: None,
-            color: Self::DEFAULT_COLOR,
-        }
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn new_unit_dir(origin: impl Into<SVector<S, D>>, dir: Unit<SVector<S, D>>) -> Self {
-        Self::from_ray(Ray::new_unit_dir(origin, dir))
-    }
-
-    #[inline]
-    #[must_use]
-    /// Does not normalize `dir`
-    pub fn new_unchecked_dir(
-        origin: impl Into<SVector<S, D>>,
-        dir: impl Into<SVector<S, D>>,
-    ) -> Self {
-        Self::from_ray(Ray::new_unchecked_dir(origin, dir))
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn with_reflection_cap(mut self, max: usize) -> Self {
-        self.reflection_cap = Some(max);
-        self
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn with_color(mut self, color: Color) -> Self {
-        self.color = color;
-        self
-    }
-}
-
-impl<S: ComplexField, const D: usize> SimulationRay<S, D> {
-    #[inline]
-    #[must_use]
-    pub fn try_new(
-        origin: impl Into<SVector<S, D>>,
-        dir: impl Into<SVector<S, D>>,
-    ) -> Option<Self> {
-        Ray::try_new(origin, dir).map(Self::from_ray)
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn new(origin: impl Into<SVector<S, D>>, dir: impl Into<SVector<S, D>>) -> Self {
-        Self::from_ray(Ray::new(origin, dir))
-    }
-}
-
-/// A set of global parameters for a simulation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct SimulationParams<S> {
-    /// See [`Ray::closest_intersection`] for more info on the role of this field.
-    ///
-    /// Will also be used as the comparison epsilon when detecting loops.
-    pub epsilon: S,
-    /// The [`Color`] passed to [`KandinskyRenderable::draw`] when requesting the mirrors
-    /// to be drawn.
-    pub mirror_color: Color,
-    /// A pause time between each reflection, useful for easily viewing the ray's path.
-    pub step_time_ms: u32,
-}
-
-impl<S: FloatCore + 'static> Default for SimulationParams<S>
+impl<S: Copy + 'static> Default for RayParams<S>
 where
     f64: AsPrimitive<S>,
 {
     fn default() -> Self {
         Self {
-            epsilon: S::epsilon() * 64.0.as_(),
-            mirror_color: Color::from_rgb([255, 0, 0]),
+            reflection_cap: None,
+            eps: 1e-6.as_(),
+            color: Color::from_rgb([248, 180, 48]),
             step_time_ms: 0,
         }
     }
 }
 
-pub fn run_simulation<M>(
-    mirror: &M,
-    rays: impl IntoIterator<Item = SimulationRay<M::Scalar, 2>>,
-    params: SimulationParams<M::Scalar>,
+/// A set of global parameters for a simulation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SimulationParams {
+    /// The [`Color`] passed to [`KandinskyRenderable::draw`] when requesting the mirrors
+    /// to be drawn.
+    pub mirror_color: Color,
+}
+
+impl Default for SimulationParams {
+    fn default() -> Self {
+        Self {
+            mirror_color: Color::from_rgb([248, 180, 48]),
+        }
+    }
+}
+
+pub fn display_simulation<H: Hyperplane>(
+    mirror: &(impl Mirror<H> + KandinskyRenderable + ?Sized),
+    rays: impl IntoIterator<Item = (Ray<H::Vector>, RayParams<Scalar<H>>)>,
+    params: SimulationParams,
 ) where
-    M: Mirror<2, Scalar: RealField + AsPrimitive<i16>> + KandinskyRenderable + ?Sized,
-    f64: AsPrimitive<M::Scalar>,
+    H::Vector: VMulAdd + ToPoint,
+    Scalar<H>: 'static + Copy,
+    f64: AsPrimitive<Scalar<H>>,
 {
     mirror.draw(params.mirror_color);
 
-    for SimulationRay {
-        ray,
-        reflection_cap,
-        color,
-    } in rays
-    {
-        let mut prev_pt = ray.origin;
-        let mut path = RayPath {
-            mirror,
-            ray,
-            eps: params.epsilon.clone(),
-        };
+    for (mut ray, params) in rays {
+        let mut prev_pt = ray.pos.to_point();
+        let mut count = 0;
+        let mut diverges = true;
 
-        let connect_line = |prev: &mut SVector<_, 2>, to: SVector<_, 2>| {
-            let [x0, y0]: [M::Scalar; 2] = (*prev).into();
-            *prev = to;
-            let [x1, y1] = to.into();
-            draw_line(
-                Point {
-                    x: x0.as_(),
-                    y: y0.as_(),
-                },
-                Point {
-                    x: x1.as_(),
-                    y: y1.as_(),
-                },
-                color,
-            );
-            eadk::time::sleep_ms(params.step_time_ms);
-        };
+        loop {
+            if params.reflection_cap.is_some_and(|n| count == n) {
+                diverges = false;
+                break;
+            }
 
-        let diverges = if let Some(n) = reflection_cap {
-            let mut count = 0;
-            for Ray { origin, .. } in path.by_ref().take(n) {
-                connect_line(&mut prev_pt, origin);
+            if let Some((dist, dir)) = ray.closest_intersection(mirror, &params.eps) {
+                ray.advance(dist);
+                let p1 = ray.pos.to_point();
+                draw_line(prev_pt, p1, params.color);
+                prev_pt = p1;
+                eadk::time::sleep_ms(params.step_time_ms);
+                ray.reflect_dir(&dir);
                 count += 1;
+            } else {
+                break;
             }
-            count < n
-        } else {
-            for Ray { origin, .. } in path.by_ref() {
-                connect_line(&mut prev_pt, origin);
-            }
-            true
-        };
+        }
 
         if diverges {
-            let new_pt = prev_pt + path.ray.dir.as_ref() * 1000.0.as_();
-            connect_line(&mut prev_pt, new_pt);
+            ray.advance(410.0.as_());
+            draw_line(prev_pt, ray.pos.to_point(), params.color);
         }
     }
 }

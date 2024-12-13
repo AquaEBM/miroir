@@ -1,4 +1,4 @@
-use nalgebra::ComplexField;
+use nalgebra::{ComplexField, RealField};
 
 use super::*;
 
@@ -32,17 +32,17 @@ impl<S: ComplexField, const D: usize> Sphere<S, D> {
 
     #[inline]
     pub fn set_radius(&mut self, r: S::RealField) {
-        self.radius = r.clone().abs();
+        self.radius = r.clone();
         self.radius_sq = r.clone() * r;
     }
 
     #[inline]
     #[must_use]
-    pub fn intersections(&self, ray: &Ray<S, D>) -> Option<[S; 2]> {
+    pub fn intersections(&self, ray: &Ray<SVector<S, D>>) -> Option<[S; 2]> {
         // substituting `V` for `P + t * D` in the sphere equation:
         // `||V - C||^2 = r^2` results in a quadratic equation in `t`.
 
-        let v = &ray.origin - &self.center;
+        let v = &ray.pos - &self.center;
 
         let b = v.dotc(&ray.dir).real();
         let c = v.norm_squared() - self.radius_sq.clone();
@@ -56,29 +56,36 @@ impl<S: ComplexField, const D: usize> Sphere<S, D> {
         })
     }
 
-    #[rustfmt::skip]
     #[inline]
     #[must_use]
     pub fn tangents_at_intersections(
         &self,
-        ray: &Ray<S, D>,
+        ray: &Ray<SVector<S, D>>,
     ) -> Option<[(S, Unit<SVector<S, D>>); 2]> {
-        self.intersections(ray).map(|ds| ds.map(|d| (
-            d.clone(),
-            // SAFETY: p := ray.at(d) is in the sphere,
-            // so ||p - self.center|| = |self.radius|
-            Unit::new_unchecked((ray.at(d) - self.center.clone()).unscale(self.radius.clone().abs())),
-        )))
+        self.intersections(ray).map(|ds| {
+            ds.map(|d| {
+                (
+                    d.clone(),
+                    // SAFETY: p := ray.at(d) is in the sphere,
+                    // so ||p - self.center|| = |self.radius|
+                    Unit::new_unchecked(
+                        (ray.at(d) - self.center.clone()).unscale(self.radius.clone().abs()),
+                    ),
+                )
+            })
+        })
     }
 }
 
-impl<S: ComplexField, const D: usize> Mirror<D> for Sphere<S, D> {
-    type Scalar = S;
-    fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, D>) {
-        if let Some(tangents) = self.tangents_at_intersections(ctx.ray()) {
-            for (d, n) in tangents {
-                ctx.add_tangent(d, Hyperplane::Normal(n));
-            }
-        }
+impl<S: RealField, const D: usize> Mirror<Unit<SVector<S, D>>> for Sphere<S, D> {
+    fn add_tangents(
+        &self,
+        ctx: &SimulationCtx<SVector<S, D>>,
+    ) -> Option<Intersection<Unit<SVector<S, D>>>> {
+        ctx.closest(
+            self.tangents_at_intersections(ctx.ray)
+                .into_iter()
+                .flatten(),
+        )
     }
 }

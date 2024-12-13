@@ -16,8 +16,8 @@ impl Camera {
     pub fn new(position: impl Into<Point3<f32>>, yaw: f32, pitch: f32) -> Self {
         Self {
             pos: position.into(),
-            yaw: yaw.into(),
-            pitch: pitch.into(),
+            yaw,
+            pitch,
         }
     }
 
@@ -62,7 +62,6 @@ impl CameraController {
         }
     }
 
-    #[rustfmt::skip]
     pub fn process_keyboard(&mut self, key: VirtualKeyCode, state: ElementState) -> bool {
         const RATIO: f32 = 0.8;
 
@@ -73,16 +72,16 @@ impl CameraController {
         let mut res = true;
 
         match key {
-            Z | W  => self.amount_forward = amount,
-            S      => self.amount_backwards = amount,
-            Q | A  => self.amount_left = amount,
-            D      => self.amount_right = amount,
-            Space  => self.amount_up = amount,
+            Z | W => self.amount_forward = amount,
+            S => self.amount_backwards = amount,
+            Q | A => self.amount_left = amount,
+            D => self.amount_right = amount,
+            Space => self.amount_up = amount,
             LShift => self.amount_down = amount,
-            Up     => self.speed /= RATIO,
-            Down   => self.speed *= RATIO,
-            Right  => self.mouse_sensitivity /= RATIO,
-            Left   => self.mouse_sensitivity *= RATIO,
+            Up => self.speed /= RATIO,
+            Down => self.speed *= RATIO,
+            Right => self.mouse_sensitivity /= RATIO,
+            Left => self.mouse_sensitivity *= RATIO,
             _ => res = false,
         }
 

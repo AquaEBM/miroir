@@ -3,9 +3,11 @@
 
 use core::panic::PanicInfo;
 
+use miroir::Ray;
 use miroir_numworks::{
+    display_simulation,
     eadk::{ion::*, kandinsky::*},
-    run_simulation, SimulationParams, SimulationRay,
+    RayParams, SimulationParams,
 };
 use miroir_shapes::{LineSegment, Sphere};
 
@@ -73,19 +75,15 @@ fn main() {
         ],
     );
 
-    let rays = [SimulationRay::new([10., 50.], [2., 1.]).with_reflection_cap(200)];
-
-    run_simulation(
-        &mirrors,
-        rays,
-        SimulationParams {
-            // high epsilon because, with f32 precision, the ray ends up piercing through walls
-            epsilon: f32::EPSILON * 1024.0,
-            // a little pause between each reflection to see the ray's movements
-            step_time_ms: 100,
+    let rays = [(
+        Ray::new_normalize([10., 50.], [2., 1.]),
+        RayParams {
+            reflection_cap: Some(100),
             ..Default::default()
         },
-    );
+    )];
+
+    display_simulation(&mirrors, rays, SimulationParams::default());
 
     while !{
         let scan = KeyboardState::scan();

@@ -11,7 +11,7 @@ use gl::{backend::glutin::DisplayCreationError, glutin};
 
 use glutin::{dpi, event_loop, window};
 use miroir::*;
-use nalgebra::{ComplexField, RealField, SVector, Scalar, Unit};
+use nalgebra::SVector;
 
 mod camera;
 mod renderable;
@@ -26,7 +26,7 @@ pub use renderable::*;
 /// The main vertex type used when rendering simulations,
 /// You are free to use whichever vertex type you wish, as long as their dimensions
 /// correctly match those of the simulation .
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
 pub struct Vertex<const N: usize> {
     pub position: [f32; N],
 }
@@ -75,112 +75,88 @@ gl::implement_vertex!(Vertex3D, position);
 
 impl<S, const D: usize> From<SVector<S, D>> for Vertex<D>
 where
-    S: Scalar + AsPrimitive<f32>,
+    S: AsPrimitive<f32>,
 {
     fn from(v: SVector<S, D>) -> Self {
         Self {
-            position: v.map(AsPrimitive::as_).into(),
+            position: array::from_fn(|i| v[i].as_()),
         }
     }
 }
 
-/// A wrapper around a [`Ray`](miroir::Ray) that contains extra data required by the simulation
-/// visualizer/runner
-#[derive(Debug, Clone)]
-pub struct SimulationRay<S, const D: usize> {
-    /// They ray used in the simulation.
-    pub ray: Ray<S, D>,
-    /// The maximum amount of reflections this ray will do. If this is `Some(n)` the ray
-    /// will perform at most `n` reflections.
-    pub reflection_cap: Option<usize>,
+pub trait GLSimulationVertex: Add + Mul<f32> + gl::Vertex {
+    const SHADER_SRC: &str;
 }
 
-impl<const D: usize, S: PartialEq> PartialEq for SimulationRay<S, D> {
-    fn eq(&self, other: &Self) -> bool {
-        self.ray == other.ray && self.reflection_cap == other.reflection_cap
-    }
+impl GLSimulationVertex for Vertex2D {
+    const SHADER_SRC: &str = r"#version 140
+
+in vec2 position;
+uniform mat4 perspective;
+uniform mat4 view;
+
+void main() {
+    gl_Position = perspective * view * vec4(position, 0.0, 1.0);
+}";
 }
 
-impl<S, const D: usize> From<Ray<S, D>> for SimulationRay<S, D> {
-    fn from(ray: Ray<S, D>) -> Self {
-        Self::from_ray(ray)
-    }
+impl GLSimulationVertex for Vertex3D {
+    const SHADER_SRC: &str = r"#version 140
+
+in vec3 position;
+uniform mat4 perspective;
+uniform mat4 view;
+
+void main() {
+    gl_Position = perspective * view * vec4(position, 1.0);
+}";
 }
 
-impl<S, const D: usize> SimulationRay<S, D> {
-    #[inline]
-    #[must_use]
-    pub const fn from_ray(ray: Ray<S, D>) -> Self {
-        Self {
-            ray,
-            reflection_cap: None,
-        }
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn new_unit_dir(origin: impl Into<SVector<S, D>>, dir: Unit<SVector<S, D>>) -> Self {
-        Self::from_ray(Ray::new_unit_dir(origin, dir))
-    }
-
-    /// Does not normalize `dir`
-    #[inline]
-    #[must_use]
-    pub fn new_unchecked_dir(
-        origin: impl Into<SVector<S, D>>,
-        dir: impl Into<SVector<S, D>>,
-    ) -> Self {
-        Self::from_ray(Ray::new_unchecked_dir(origin, dir))
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn with_reflection_cap(mut self, max: usize) -> Self {
-        self.reflection_cap = Some(max);
-        self
-    }
+pub trait ToGLVertex {
+    type Vertex: GLSimulationVertex;
+    fn to_gl_vertex(&self) -> Self::Vertex;
 }
 
-impl<S: ComplexField, const D: usize> SimulationRay<S, D> {
-    #[inline]
-    #[must_use]
-    pub fn try_new(
-        origin: impl Into<SVector<S, D>>,
-        dir: impl Into<SVector<S, D>>,
-    ) -> Option<Self> {
-        Ray::try_new(origin, dir).map(Self::from_ray)
-    }
+impl<S, const D: usize> ToGLVertex for SVector<S, D>
+where
+    S: AsPrimitive<f32>,
+    Vertex<D>: GLSimulationVertex,
+{
+    type Vertex = Vertex<D>;
 
-    #[inline]
-    #[must_use]
-    pub fn new(origin: impl Into<SVector<S, D>>, dir: impl Into<SVector<S, D>>) -> Self {
-        Self::from_ray(Ray::new(origin, dir))
+    fn to_gl_vertex(&self) -> Self::Vertex {
+        (*self).into()
     }
 }
 
 /// A set of global parameters for a simulation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct SimulationParams<S> {
+pub struct RayParams<S> {
     /// See [`Ray::closest_intersection`] for more info on the role of this field.
     ///
     /// Will also be used as the comparison epsilon when detecting loops.
     pub epsilon: S,
     /// Whether to detect if the ray's path ends up in an infinite loop,
     /// and halt the simulation accordingly. Default: `false`
-    pub detect_loops: bool,
+    pub detect_loops: Option<S>,
+    pub reflection_cap: Option<usize>,
 }
 
-impl<S: FloatCore + 'static> Default for SimulationParams<S>
+impl<S: FloatCore + 'static> Default for RayParams<S>
 where
     f64: AsPrimitive<S>,
 {
     fn default() -> Self {
         Self {
-            epsilon: S::epsilon() * 64.0.as_(),
-            detect_loops: false,
+            epsilon: 1e-6.as_(),
+            detect_loops: None,
+            reflection_cap: None,
         }
     }
 }
+
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SimulationParams;
 
 /// A handle for the window used to visualize simulations.
 pub struct SimulationWindow {
@@ -204,14 +180,14 @@ impl SimulationWindow {
     }
 
     #[inline]
-    pub fn run<const D: usize, M>(
+    pub fn display<H: Hyperplane<Vector: Vector + VMulAdd + ToGLVertex + 'static>>(
         self,
-        mirror: &M,
-        rays: impl IntoIterator<Item = SimulationRay<M::Scalar, D>>,
-        params: SimulationParams<M::Scalar>,
+        mirror: &(impl Mirror<H> + OpenGLRenderable + ?Sized),
+        rays: impl IntoIterator<Item = (Ray<H::Vector>, RayParams<Scalar<H>>)>,
+        params: SimulationParams,
     ) where
-        M: Mirror<D, Scalar: RealField> + OpenGLRenderable + ?Sized,
-        Vertex<D>: gl::Vertex + From<SVector<M::Scalar, D>>,
+        Scalar<H>: Copy + 'static,
+        f64: AsPrimitive<Scalar<H>>,
     {
         let Self {
             events_loop,

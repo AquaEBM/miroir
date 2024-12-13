@@ -6,8 +6,10 @@ edition = "2021"
 
 [dependencies]
 
-miroir = { path = "../miroir_core" }
+miroir = { path = "../miroir" }
 miroir_shapes = { path = "../miroir_shapes" }
+
+# TODO: update this
 
 glium = "0.32"
 

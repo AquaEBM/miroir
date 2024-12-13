@@ -8,122 +8,82 @@ use gl::index::{NoIndices, PrimitiveType};
 use nalgebra::{Perspective3, Point3};
 const LINE_STRIP: NoIndices = NoIndices(PrimitiveType::LineStrip);
 
-pub struct SimulationRenderData<const D: usize> {
-    ray_origins: gl::VertexBuffer<Vertex<D>>,
-    ray_paths: Vec<(gl::VertexBuffer<Vertex<D>>, gl::VertexBuffer<Vertex<D>>)>,
+pub struct SimulationRenderData<V: Copy> {
+    ray_origins: gl::VertexBuffer<V>,
+    ray_paths: Vec<(gl::VertexBuffer<V>, gl::VertexBuffer<V>)>,
     mirrors: Vec<Box<dyn RenderData>>,
     program: gl::Program,
     starting_pts_program: gl::Program,
 }
 
-const FRAGMENT_SHADER_SRC: &str = r"
-    #version 140
+const FRAGMENT_SHADER_SRC: &str = r"#version 140
 
-    uniform vec4 color_vec;
+uniform vec4 color_vec;
+out vec4 color;
 
-    out vec4 color;
+void main() {
+    color = color_vec;
+}";
 
-    void main() {
-        color = color_vec;
-    }
-";
+const STARTING_POINT_GEOMETRY_SHADER_SRC: &str = r"#version 330
 
-const STARTING_POINT_GEOMETRY_SHADER_SRC: &str = r"
-    #version 330
+layout (points) in;
+layout (line_strip, max_vertices = 4) out;
 
-    layout (points) in;
-    layout (line_strip, max_vertices = 4) out;
+mat4 translate(vec2 delta) {
+    return(mat4(
+        vec4(1.0, 0.0, 0.0, 0.0),
+        vec4(0.0, 1.0, 0.0, 0.0),
+        vec4(0.0, 0.0, 1.0, 0.0),
+        vec4(delta, 0.0, 1.0)
+    ));
+}
 
-    mat4 translate(vec2 delta) {
-        return(mat4(
-            vec4(1.0, 0.0, 0.0, 0.0),
-            vec4(0.0, 1.0, 0.0, 0.0),
-            vec4(0.0, 0.0, 1.0, 0.0),
-            vec4(delta, 0.0, 1.0)
-        ));
-    }
+uniform float aspect;
 
-    uniform float aspect;
+void main() {
+    vec4 pos = gl_in[0].gl_Position;
 
-    void main() {
-        vec4 pos = gl_in[0].gl_Position;
+    float v = 0.025;
 
-        float v = 0.025;
+    vec2 t1 = vec2(v, v * aspect);
 
-        vec2 t1 = vec2(v, v * aspect);
+    gl_Position = translate(t1) * pos;
+    EmitVertex();
 
-        gl_Position = translate(t1) * pos;
-        EmitVertex();
+    gl_Position = translate(-t1) * pos;
+    EmitVertex();
+    EndPrimitive();
 
-        gl_Position = translate(-t1) * pos;
-        EmitVertex();
-        EndPrimitive();
+    vec2 t2 = vec2(v, -v * aspect);
 
-        vec2 t2 = vec2(v, -v * aspect);
+    gl_Position = translate(t2) * pos;
+    EmitVertex();
 
-        gl_Position = translate(t2) * pos;
-        EmitVertex();
+    gl_Position = translate(-t2) * pos;
+    EmitVertex();
+    EndPrimitive();
+}";
 
-        gl_Position = translate(-t2) * pos;
-        EmitVertex();
-        EndPrimitive();
-    }
-";
-
-const VERTEX_SHADER_2D_SRC: &str = r"
-    #version 140
-
-    in vec2 position;
-    uniform mat4 perspective;
-    uniform mat4 view;
-
-    void main() {
-        gl_Position = perspective * view * vec4(position, 0.0, 1.0);
-    }
-";
-
-const VERTEX_SHADER_3D_SRC: &str = r"
-    #version 140
-
-    in vec3 position;
-    uniform mat4 perspective;
-    uniform mat4 view;
-
-    void main() {
-        gl_Position = perspective * view * vec4(position, 1.0);
-    }
-";
-
-impl<const D: usize> SimulationRenderData<D>
-where
-    Vertex<D>: gl::Vertex,
-{
-    pub(crate) fn from_simulation<M, R>(
-        mirror: &M,
-        rays: R,
+impl<V: GLSimulationVertex + 'static> SimulationRenderData<V> {
+    pub(crate) fn from_simulation<
+        H: Hyperplane<Vector: VMulAdd + Vector + ToGLVertex<Vertex = V>>,
+    >(
+        mirror: &(impl Mirror<H> + OpenGLRenderable + ?Sized),
+        rays: impl IntoIterator<Item = (Ray<H::Vector>, RayParams<Scalar<H>>)>,
         display: &gl::Display,
-        params: SimulationParams<M::Scalar>,
+        _params: SimulationParams,
     ) -> Self
     where
-        M: Mirror<D, Scalar: RealField> + OpenGLRenderable + ?Sized,
-        R: IntoIterator<Item = SimulationRay<M::Scalar, D>>,
-        Vertex<D>: From<SVector<M::Scalar, D>>,
+        Scalar<H>: Copy + 'static,
+        f64: AsPrimitive<Scalar<H>>,
     {
-        let vertex_shader_src = if D == 2 {
-            VERTEX_SHADER_2D_SRC
-        } else if D == 3 {
-            VERTEX_SHADER_3D_SRC
-        } else {
-            unreachable!()
-        };
-
         let program =
-            gl::Program::from_source(display, vertex_shader_src, FRAGMENT_SHADER_SRC, None)
-                .unwrap();
+            gl::Program::from_source(display, V::SHADER_SRC, FRAGMENT_SHADER_SRC, None).unwrap();
 
         let starting_pts_program = gl::Program::from_source(
             display,
-            vertex_shader_src,
+            V::SHADER_SRC,
             FRAGMENT_SHADER_SRC,
             Some(STARTING_POINT_GEOMETRY_SHADER_SRC),
         )
@@ -134,75 +94,40 @@ where
         mirror.append_render_data(display, &mut mirrors);
 
         let mut vertex_scratch = vec![];
-        let mut pt_scratch = vec![];
 
         let mut mirrors = mirrors.into_inner();
         let mut ray_origins = vec![];
         let mut ray_paths = vec![];
 
-        for SimulationRay {
-            ray,
-            reflection_cap,
-        } in rays
-        {
-            ray_origins.push(Vertex::from(ray.origin.clone()));
+        for (mut ray, params) in rays {
+            ray_origins.push(ray.pos.to_gl_vertex());
 
             vertex_scratch.clear();
-            pt_scratch.push(ray.origin.clone());
+            vertex_scratch.push(ray.pos.to_gl_vertex());
 
-            let mut path = RayPath {
-                mirror,
-                ray,
-                eps: params.epsilon.clone(),
-            };
+            let mut count = 0;
+            let mut outcome: Result<bool, usize> = Ok(true);
 
-            let path_iter = path.by_ref();
-
-            let outcome = 'block: {
-                if let Some(n) = reflection_cap {
-                    for Ray { origin, .. } in path_iter.take(n) {
-                        let out = loop_index(&pt_scratch, &origin, &params.epsilon);
-                        if out.is_some() {
-                            break 'block Some(out);
-                        }
-
-                        pt_scratch.push(origin);
-                    }
-
-                    (pt_scratch.len() <= n).then_some(None)
-                } else {
-                    for Ray { origin, .. } in path_iter {
-                        let out = loop_index(&pt_scratch, &origin, &params.epsilon);
-                        if out.is_some() {
-                            break 'block Some(out);
-                        }
-
-                        pt_scratch.push(origin);
-                    }
-
-                    Some(None)
+            while let Some((dist, dir)) = ray.closest_intersection(mirror, &params.epsilon) {
+                if params.reflection_cap.is_some_and(|n| count == n) {
+                    outcome = Ok(false);
+                    break;
                 }
-            };
-
-            let loop_path = if let Some(Some(loop_index)) = outcome {
-                vertex_scratch.extend(pt_scratch.drain(loop_index..).map(Vertex::from));
-                gl::VertexBuffer::immutable(display, &vertex_scratch).unwrap()
-            } else {
-                gl::VertexBuffer::empty_immutable(display, 0).unwrap()
-            };
-
-            vertex_scratch.clear();
-            vertex_scratch.extend(pt_scratch.drain(..).map(Vertex::from));
-
-            if let Some(None) = outcome {
-                let last = *vertex_scratch.last().unwrap();
-                let dir = Vertex::from(path.ray.dir.clone().into_inner());
-                vertex_scratch.push(last + 20000. * dir);
+                ray.advance(dist);
+                vertex_scratch.push(ray.pos.to_gl_vertex());
+                ray.reflect_dir(&dir);
+                count += 1;
             }
 
-            let non_loop_path = gl::VertexBuffer::immutable(display, &vertex_scratch).unwrap();
+            if let Ok(true) = outcome {
+                ray.advance(10000.0.as_());
+                vertex_scratch.push(ray.pos.to_gl_vertex());
+            }
 
-            ray_paths.push((non_loop_path, loop_path));
+            ray_paths.push((
+                gl::VertexBuffer::immutable(display, &vertex_scratch).unwrap(),
+                gl::VertexBuffer::empty(display, 0).unwrap(),
+            ));
         }
 
         mirrors.shrink_to_fit();
@@ -332,20 +257,14 @@ where
     fn render_3d(&self, display: &gl::Display, camera: &Camera, projection: &Perspective3<f32>) {
         const RAY_LOOP_COL: [f32; 4] = [0.9, 0.2, 0.9, 1.0];
         const RAY_NON_LOOP_COL: [f32; 4] = [0.7, 0.7, 0.7, 0.9];
-        let mirror_color = if D == 3 {
-            [0.05f32, 0.2, 0.2, 0.4]
-        } else if D == 2 {
-            [0.15, 0.5, 0.5, 1.0]
-        } else {
-            unreachable!();
-        };
+        const MIRROR_COLOR: [f32; 4] = [0.05f32, 0.2, 0.2, 0.4];
 
         let mut target = display.draw();
 
         use gl::Surface;
         target.clear_color_and_depth((0.01, 0.01, 0.05, 1.), 1.0);
 
-        let perspective: [[_; 4]; 4] = projection.as_matrix().clone().into();
+        let perspective: [[_; 4]; 4] = projection.into_inner().into();
         let view: [[_; 4]; 4] = camera.calc_matrix().into();
 
         let aspect = projection.aspect();
@@ -394,7 +313,7 @@ where
                     &gl::uniform! {
                         perspective: perspective,
                         view: view,
-                        color_vec: mirror_color,
+                        color_vec: MIRROR_COLOR,
                     },
                     &params,
                 )

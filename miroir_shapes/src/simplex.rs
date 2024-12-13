@@ -109,7 +109,7 @@ where
 impl<S: RealField, const D: usize> Simplex<S, D> {
     /// Returns the distance `d` such that [`ray.at(d)`](Ray::at) intersects with `self`
     #[inline]
-    pub fn intersection(&self, ray: &Ray<S, D>) -> Option<S> {
+    pub fn intersection(&self, ray: &Ray<SVector<S, D>>) -> Option<S> {
         let p = self.inner_plane();
 
         let intersection_coords = p.intersection_coordinates(ray, p.v0());
@@ -133,11 +133,14 @@ impl<S: RealField, const D: usize> Simplex<S, D> {
     }
 }
 
-impl<S: RealField, const D: usize> Mirror<D> for Simplex<S, D> {
-    type Scalar = S;
-    fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, D>) {
-        if let Some(t) = self.intersection(ctx.ray()) {
-            ctx.add_tangent(t, Hyperplane::Plane(self.inner_plane_ortho().clone()));
-        }
+impl<S: RealField, const D: usize> Mirror<HyperplaneBasisOrtho<S, D>> for Simplex<S, D> {
+    fn add_tangents(
+        &self,
+        ctx: &SimulationCtx<SVector<S, D>>,
+    ) -> Option<Intersection<HyperplaneBasisOrtho<S, D>>> {
+        ctx.closest(
+            self.intersection(ctx.ray)
+                .map(|dist| (dist, self.inner_plane_ortho().clone())),
+        )
     }
 }

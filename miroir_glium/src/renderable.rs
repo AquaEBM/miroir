@@ -11,7 +11,7 @@ pub trait RenderData {
     fn indices(&self) -> gl::index::IndicesSource;
 }
 
-/// glium_shapes 3Dconvenience blanket impl
+/// glium_shapes 3D convenience blanket impl
 impl RenderData for glium_shapes::sphere::Sphere {
     fn vertices(&self) -> gl::vertex::VerticesSource {
         self.into()
@@ -128,13 +128,13 @@ impl<T: OpenGLRenderable> OpenGLRenderable for Vec<T> {
     }
 }
 
-impl<'a, T: OpenGLRenderable + ?Sized> OpenGLRenderable for &'a T {
+impl<T: OpenGLRenderable + ?Sized> OpenGLRenderable for &T {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         (*self).append_render_data(display, list);
     }
 }
 
-impl<'a, T: OpenGLRenderable + ?Sized> OpenGLRenderable for &'a mut T {
+impl<T: OpenGLRenderable + ?Sized> OpenGLRenderable for &mut T {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
         self.deref().append_render_data(display, list);
     }

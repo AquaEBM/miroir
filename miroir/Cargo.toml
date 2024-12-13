@@ -1,0 +1,16 @@
+[package]
+name = "miroir"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+nalgebra = { version = "0.33", optional = true, default-features = false }
+either = { version = "1", default-features = false }
+
+[features]
+
+default = ["std", "nalgebra"]
+alloc = ["nalgebra/alloc"]
+std = ["nalgebra/std", "alloc"]
+libm = ["nalgebra/libm"]

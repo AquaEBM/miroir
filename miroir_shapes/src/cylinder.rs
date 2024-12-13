@@ -74,13 +74,13 @@ impl<S: RealField> Cylinder<S> {
     #[must_use]
     pub fn tangents_at_intersections(
         &self,
-        ray: &Ray<S, 3>,
+        ray: &Ray<SVector<S, 3>>,
     ) -> ArrayVec<(S, Unit<SVector<S, 3>>), 2> {
         let line_coord = |v| self.dist.dot(&v) * self.inv_norm_dist_squared.clone();
         let p = |v| &self.dist * line_coord(v);
 
-        let m = &ray.origin - &self.start;
-        let d = ray.dir.as_ref();
+        let m = &ray.pos - &self.start;
+        let d = &ray.dir;
         let pm = p(m.clone());
         let pd = p(d.clone());
 
@@ -117,11 +117,11 @@ impl<S: RealField> Cylinder<S> {
     }
 }
 
-impl<S: RealField> Mirror<3> for Cylinder<S> {
-    type Scalar = S;
-    fn add_tangents(&self, ctx: &mut SimulationCtx<Self::Scalar, 3>) {
-        for (d, n) in self.tangents_at_intersections(ctx.ray()) {
-            ctx.add_tangent(d, Hyperplane::Normal(n));
-        }
+impl<S: RealField> Mirror<Unit<SVector<S, 3>>> for Cylinder<S> {
+    fn add_tangents(
+        &self,
+        ctx: &SimulationCtx<SVector<S, 3>>,
+    ) -> Option<Intersection<Unit<SVector<S, 3>>>> {
+        ctx.closest(self.tangents_at_intersections(ctx.ray))
     }
 }

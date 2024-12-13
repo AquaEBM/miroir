@@ -1,4 +1,5 @@
-use miroir_glium::{SimulationParams, SimulationRay, SimulationWindow};
+use miroir::Ray;
+use miroir_glium::{RayParams, SimulationParams, SimulationWindow};
 use miroir_shapes::LineSegment;
 
 fn main() {
@@ -9,7 +10,13 @@ fn main() {
         LineSegment::new([[0., -1.], [-1., 0.]]),
     ];
 
-    let rays = [SimulationRay::new([0.5, 0.33], [1., 1.1])];
+    let rays = [(
+        Ray::new_normalize([0.5, 0.33], [1., 1.1]),
+        RayParams {
+            reflection_cap: Some(100),
+            ..Default::default()
+        },
+    )];
 
-    SimulationWindow::default().run(&mirrors, rays, SimulationParams::default());
+    SimulationWindow::default().display(&mirrors, rays, SimulationParams::default());
 }

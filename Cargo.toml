@@ -1,7 +1,7 @@
 [workspace]
 
 members = [
-    "miroir_core",
+    "miroir",
     "miroir_glium",
     "miroir_shapes",
     "miroir_numworks",

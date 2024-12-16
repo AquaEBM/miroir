@@ -3,10 +3,13 @@
 
 use core::panic::PanicInfo;
 
-use miroir::Ray;
 use miroir_numworks::{
     display_simulation,
-    eadk::{ion::*, kandinsky::*},
+    eadk::{
+        ion::{Key, KeyboardState},
+        kandinsky::{draw_string_unchecked, fill_rect, Color, Point, Rect},
+    },
+    miroir::Ray,
     RayParams, SimulationParams,
 };
 use miroir_shapes::{LineSegment, Sphere};

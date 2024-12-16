@@ -40,4 +40,4 @@ miroir_numworks = { git = "https://github.com/AquaEBM/miroir", features = ["allo
 #          only add this if you have an allocator configured ^^^^^^^^^^^^^^^^^^^^^^
 ```
 
-This crate already re-exports [`miroir`](../miroir_core), [`miroir_shapes`](../miroir_shapes) and [`eadk_rs`](https://github.com/AquaEBM/eadk_rs) for convenience, and to avoid dependency synchronisation issues.
+This crate already re-exports [`miroir`](../miroir_core) and [`eadk_rs`](https://github.com/AquaEBM/eadk_rs) for convenience, and to avoid dependency synchronisation issues.

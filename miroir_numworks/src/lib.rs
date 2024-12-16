@@ -1,12 +1,8 @@
 #![no_std]
 
 use core::ops::Deref;
-use eadk::kandinsky::*;
-use miroir::{
-    either::Either,
-    nalgebra::{RealField, SVector},
-    Hyperplane, Mirror, Ray, Scalar, VMulAdd,
-};
+use eadk::kandinsky::{draw_line, Color, Point};
+use miroir::{either::Either, Hyperplane, Mirror, Ray, Scalar, VMulAdd};
 use num_traits::AsPrimitive;
 
 #[cfg(feature = "alloc")]
@@ -21,7 +17,8 @@ pub trait ToPoint {
     fn to_point(&self) -> Point;
 }
 
-impl<S: miroir::nalgebra::Scalar + AsPrimitive<i16>> ToPoint for SVector<S, 2> {
+#[cfg(feature = "nalgebra")]
+impl<S: miroir::nalgebra::Scalar + AsPrimitive<i16>> ToPoint for miroir::nalgebra::SVector<S, 2> {
     fn to_point(&self) -> Point {
         let [x, y] = (*self).into();
         Point {
@@ -35,23 +32,6 @@ impl<S: miroir::nalgebra::Scalar + AsPrimitive<i16>> ToPoint for SVector<S, 2> {
 #[impl_trait_for_tuples::impl_for_tuples(16)]
 pub trait KandinskyRenderable {
     fn draw(&self, color: Color);
-}
-
-impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for miroir_shapes::Sphere<S, 2> {
-    fn draw(&self, color: Color) {
-        draw_circle(
-            self.center.to_point(),
-            self.radius().as_().unsigned_abs(),
-            color,
-        );
-    }
-}
-
-impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for miroir_shapes::LineSegment<S> {
-    fn draw(&self, color: Color) {
-        let [start, end] = self.vertices();
-        draw_line(start.to_point(), end.to_point(), color);
-    }
 }
 
 impl<T: KandinskyRenderable, U: KandinskyRenderable> KandinskyRenderable for Either<T, U> {

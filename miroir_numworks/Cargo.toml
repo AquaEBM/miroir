@@ -7,11 +7,16 @@ edition = "2021"
 [dependencies]
 
 impl-trait-for-tuples = "0.2"
-miroir = { path = "../miroir", default-features = false,  features = ["nalgebra", "libm"] }
-miroir_shapes = { path = "../miroir_shapes" }
+miroir = { path = "../miroir", default-features = false,  features = ["libm"] }
 num-traits = { version = "0.2", default-features = false }
 eadk = { git = "https://github.com/AquaEBM/eadk_rs" }
 
 [features]
-default = []
+
+default = ["nalgebra"]
+nalgebra = ["miroir/nalgebra"]
 alloc = ["miroir/alloc"]
+
+[dev-dependencies]
+
+miroir_shapes = { path = "../miroir_shapes", features = ["miroir_numworks"] }

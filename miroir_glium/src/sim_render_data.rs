@@ -8,12 +8,19 @@ use gl::index::{NoIndices, PrimitiveType};
 use nalgebra::{Perspective3, Point3};
 const LINE_STRIP: NoIndices = NoIndices(PrimitiveType::LineStrip);
 
+struct RayPath<V: Copy> {
+    color: [f32 ; 4],
+    non_loop_path: gl::VertexBuffer<V>,
+    loop_path: Option<([f32; 4], gl::VertexBuffer<V>)>,
+}
+
 pub struct SimulationRenderData<V: Copy> {
     ray_origins: gl::VertexBuffer<V>,
-    ray_paths: Vec<(gl::VertexBuffer<V>, gl::VertexBuffer<V>)>,
+    ray_paths: Vec<RayPath<V>>,
     mirrors: Vec<Box<dyn RenderData>>,
     program: gl::Program,
     starting_pts_program: gl::Program,
+    global_params: SimulationParams,
 }
 
 const FRAGMENT_SHADER_SRC: &str = r"#version 140
@@ -72,7 +79,7 @@ impl<V: GLSimulationVertex + 'static> SimulationRenderData<V> {
         mirror: &(impl Mirror<H> + OpenGLRenderable + ?Sized),
         rays: impl IntoIterator<Item = (Ray<H::Vector>, RayParams<Scalar<H>>)>,
         display: &gl::Display,
-        _params: SimulationParams,
+        global_params: SimulationParams,
     ) -> Self
     where
         Scalar<H>: Copy + 'static,
@@ -124,10 +131,11 @@ impl<V: GLSimulationVertex + 'static> SimulationRenderData<V> {
                 vertex_scratch.push(ray.pos.to_gl_vertex());
             }
 
-            ray_paths.push((
-                gl::VertexBuffer::immutable(display, &vertex_scratch).unwrap(),
-                gl::VertexBuffer::empty(display, 0).unwrap(),
-            ));
+            ray_paths.push(RayPath {
+                color: params.path_color,
+                non_loop_path: gl::VertexBuffer::immutable(display, &vertex_scratch).unwrap(),
+                loop_path: None,
+            });
         }
 
         mirrors.shrink_to_fit();
@@ -139,6 +147,7 @@ impl<V: GLSimulationVertex + 'static> SimulationRenderData<V> {
             mirrors,
             program,
             starting_pts_program,
+            global_params,
         }
     }
 
@@ -255,26 +264,22 @@ impl<V: GLSimulationVertex + 'static> SimulationRenderData<V> {
     }
 
     fn render_3d(&self, display: &gl::Display, camera: &Camera, projection: &Perspective3<f32>) {
-        const RAY_LOOP_COL: [f32; 4] = [0.9, 0.2, 0.9, 1.0];
-        const RAY_NON_LOOP_COL: [f32; 4] = [0.7, 0.7, 0.7, 0.9];
-        const MIRROR_COLOR: [f32; 4] = [0.05f32, 0.2, 0.2, 0.4];
-
         let mut target = display.draw();
 
         use gl::Surface;
-        target.clear_color_and_depth((0.01, 0.01, 0.05, 1.), 1.0);
+        target.clear_color_and_depth(self.global_params.bg_color.into(), 1.0);
 
         let perspective: [[_; 4]; 4] = projection.into_inner().into();
         let view: [[_; 4]; 4] = camera.calc_matrix().into();
 
         let aspect = projection.aspect();
 
-        let params = gl::DrawParameters {
+        let render_params = gl::DrawParameters {
             blend: gl::Blend::alpha_blending(),
             ..Default::default()
         };
 
-        for (non_loop_path, loop_path) in &self.ray_paths {
+        for RayPath { color, non_loop_path, loop_path } in &self.ray_paths {
             target
                 .draw(
                     non_loop_path,
@@ -283,25 +288,27 @@ impl<V: GLSimulationVertex + 'static> SimulationRenderData<V> {
                     &gl::uniform! {
                         perspective: perspective,
                         view: view,
-                        color_vec: RAY_NON_LOOP_COL,
+                        color_vec: *color,
                     },
-                    &params,
+                    &render_params,
                 )
                 .unwrap();
 
-            target
-                .draw(
-                    loop_path,
-                    NoIndices(PrimitiveType::LineLoop),
-                    &self.program,
-                    &gl::uniform! {
-                        perspective: perspective,
-                        view: view,
-                        color_vec: RAY_LOOP_COL,
-                    },
-                    &params,
-                )
-                .unwrap();
+            if let Some((col, buf)) = loop_path {
+                target
+                    .draw(
+                        buf,
+                        NoIndices(PrimitiveType::LineLoop),
+                        &self.program,
+                        &gl::uniform! {
+                            perspective: perspective,
+                            view: view,
+                            color_vec: *col,
+                        },
+                        &render_params,
+                    )
+                    .unwrap();
+            }
         }
 
         for render_data in self.mirrors.iter().map(Box::as_ref) {
@@ -313,9 +320,9 @@ impl<V: GLSimulationVertex + 'static> SimulationRenderData<V> {
                     &gl::uniform! {
                         perspective: perspective,
                         view: view,
-                        color_vec: MIRROR_COLOR,
+                        color_vec: self.global_params.mirror_color,
                     },
-                    &params,
+                    &render_params,
                 )
                 .unwrap();
         }
@@ -332,7 +339,7 @@ impl<V: GLSimulationVertex + 'static> SimulationRenderData<V> {
                     color_vec: [1.0f32, 0.0, 0.0, 1.0],
                     aspect: aspect,
                 },
-                &params,
+                &render_params,
             )
             .unwrap();
 

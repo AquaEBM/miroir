@@ -204,6 +204,7 @@ impl<S: SimdComplexField, const D: usize> Hyperplane for HyperplaneBasisOrtho<S,
             })
             .sum();
         *v = p2 - &*v;
+        v.normalize_mut();
     }
 }
 

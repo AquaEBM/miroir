@@ -28,8 +28,6 @@ Here are screenshots of some of the examples' visualisations:
 - Use the right/left arrow key to increase/decrease camera rotation sensitivity.
 - Use the up/down key to increase/decrease movement speed.
 
-Currently, the ray's path is drawn in white, and the portion of the path that loops infinitely (if it exists) is drawn in pink. (TODO: allow user-setting these)
-
 ## Documentation
 
 For more information on how to use this crate, check out the docs:
@@ -52,6 +50,5 @@ This crate already re-exports [`glium`](https://crates.io/crates/glium/) for con
 
 ### TODOs
 
-- Visualisations lack customization, mainly in the choice of colors...
 - 3D simulations lack any kind of lighting, hence, making viewing complex, curved, surfaces awkward. I am not (yet?) well-versed enough in 3D rendering to know how to implement this neatly.
 - This uses a slightly older version of [`glium`](https://crates.io/crates/glium/), because we rely on [`glium_shapes`](https://crates.io/crates/glium_shapes) to create the vertices of a 3D sphere. Hand-roll our own implementation, bump the dependency, and adapt to API changes.

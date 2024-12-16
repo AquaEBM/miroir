@@ -130,16 +130,18 @@ where
 }
 
 /// A set of global parameters for a simulation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct RayParams<S> {
     /// See [`Ray::closest_intersection`] for more info on the role of this field.
     ///
     /// Will also be used as the comparison epsilon when detecting loops.
     pub epsilon: S,
     /// Whether to detect if the ray's path ends up in an infinite loop,
-    /// and halt the simulation accordingly. Default: `false`
-    pub detect_loops: Option<S>,
+    /// and the epsilon value used for comparisons, and the color used to draw the section
+    /// of the path that loops infinitely
+    pub loop_detection: Option<(S, [f32 ; 4])>,
     pub reflection_cap: Option<usize>,
+    pub path_color: [f32 ; 4],
 }
 
 impl<S: FloatCore + 'static> Default for RayParams<S>
@@ -149,14 +151,27 @@ where
     fn default() -> Self {
         Self {
             epsilon: 1e-6.as_(),
-            detect_loops: None,
+            loop_detection: None,
             reflection_cap: None,
+            path_color: [1., 1., 1., 1.],
         }
     }
 }
 
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct SimulationParams;
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct SimulationParams {
+    pub mirror_color: [f32 ; 4],
+    pub bg_color: [f32 ; 4],
+}
+
+impl Default for SimulationParams {
+    fn default() -> Self {
+        Self {
+            mirror_color: [0., 0., 1., 0.33],
+            bg_color: [0., 0., 0., 1.],
+        }
+    }
+}
 
 /// A handle for the window used to visualize simulations.
 pub struct SimulationWindow {

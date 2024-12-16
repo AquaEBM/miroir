@@ -53,5 +53,12 @@ fn main() {
         },
     )];
 
-    SimulationWindow::default().display(&mirrors, rays, SimulationParams::default());
+    SimulationWindow::default().display(
+        &mirrors,
+        rays,
+        SimulationParams {
+            mirror_color: [0., 0., 1., 0.1],
+            bg_color: [0.01, 0.01, 0.05, 1.],
+        }
+    );
 }

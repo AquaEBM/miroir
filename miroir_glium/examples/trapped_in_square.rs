@@ -4,7 +4,7 @@ use miroir_shapes::LineSegment;
 
 fn main() {
     let mirrors = [
-        LineSegment::new([[1., 0.], [0., 1.]]),
+        LineSegment::new([[1f32, 0.], [0., 1.]]),
         LineSegment::new([[0., 1.], [-1., 0.]]),
         LineSegment::new([[1., 0.], [0., -1.]]),
         LineSegment::new([[0., -1.], [-1., 0.]]),
@@ -18,5 +18,12 @@ fn main() {
         },
     )];
 
-    SimulationWindow::default().display(&mirrors, rays, SimulationParams::default());
+    SimulationWindow::default().display(
+        &mirrors,
+        rays,
+        SimulationParams {
+            mirror_color: [0., 1., 0., 1.],
+            bg_color: [0.01, 0.01, 0.05, 1.],
+        },
+    );
 }

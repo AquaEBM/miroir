@@ -1,4 +1,4 @@
-#![no_std]
+#![cfg_attr(not(feature = "miroir_glium"), no_std)]
 
 mod cylinder;
 mod simplex;
@@ -8,6 +8,12 @@ pub use cylinder::*;
 pub use simplex::*;
 pub use sphere::*;
 
-use miroir::*;
+#[cfg(feature = "miroir_numworks")]
+use miroir_numworks::{*, eadk::kandinsky::*};
 
-use nalgebra::{SVector, Unit};
+#[cfg(feature = "miroir_glium")]
+use miroir_glium::*;
+
+use miroir::*;
+use nalgebra::{SVector, Unit, ComplexField, RealField};
+use num_traits::AsPrimitive;

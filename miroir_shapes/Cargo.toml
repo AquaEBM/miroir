@@ -7,3 +7,6 @@ edition = "2021"
 
 miroir = { path = "../miroir", default-features = false }
 arrayvec = { version = "0.7", default-features = false }
+miroir_glium = { path = "../miroir_glium", optional = true }
+miroir_numworks = { path = "../miroir_numworks", optional = true }
+num-traits = { version = "0.2", default-features = false }

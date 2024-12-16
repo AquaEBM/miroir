@@ -1,7 +1,5 @@
 use core::ops::AddAssign;
 
-use nalgebra::{ComplexField, RealField};
-
 use super::*;
 
 /// A (D-1)-simplex in D-dimensional (euclidean) space
@@ -143,5 +141,50 @@ impl<S: RealField, const D: usize> Mirror<HyperplaneBasisOrtho<S, D>> for Simple
             self.intersection(ray)
                 .map(|dist| (dist, self.inner_plane_ortho().clone())),
         )
+    }
+}
+
+#[cfg(feature = "miroir_glium")]
+struct SimplexRenderData<const D: usize> {
+    vertices: gl::VertexBuffer<Vertex<D>>,
+}
+
+#[cfg(feature = "miroir_glium")]
+impl<const D: usize> RenderData for SimplexRenderData<D> {
+    fn vertices(&self) -> gl::vertex::VerticesSource {
+        (&self.vertices).into()
+    }
+
+    fn indices(&self) -> gl::index::IndicesSource {
+        gl::index::IndicesSource::NoIndices {
+            primitives: match D {
+                0 => unreachable!("dimension must not be zero"),
+                1 | 2 => gl::index::PrimitiveType::LinesList,
+                _ => gl::index::PrimitiveType::TriangleStrip,
+            },
+        }
+    }
+}
+
+#[cfg(feature = "miroir_glium")]
+impl<S, const D: usize> OpenGLRenderable for Simplex<S, D>
+where
+    Vertex<D>: gl::Vertex + From<SVector<S, D>>,
+    SVector<S, D>: AddAssign + Clone,
+{
+    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
+        let vertices = self.vertices().map(Vertex::from);
+
+        list.push(Box::new(SimplexRenderData {
+            vertices: gl::VertexBuffer::new(display, vertices.as_slice()).unwrap(),
+        }))
+    }
+}
+
+#[cfg(feature = "miroir_numworks")]
+impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for LineSegment<S> {
+    fn draw(&self, color: Color) {
+        let [start, end] = self.vertices();
+        draw_line(start.to_point(), end.to_point(), color);
     }
 }

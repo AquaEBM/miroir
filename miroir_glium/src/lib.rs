@@ -2,30 +2,25 @@ use core::{
     array,
     ops::{Add, Deref, Mul},
 };
-extern crate alloc;
-use alloc::{boxed::Box, collections::TryReserveError, rc::Rc, sync::Arc, vec::Vec};
-use num_traits::{float::FloatCore, AsPrimitive};
-use std::time;
+use num_traits::AsPrimitive;
+use std::{time, collections::TryReserveError, rc::Rc, sync::Arc};
 
 use gl::{backend::glutin::DisplayCreationError, glutin};
 
 use glutin::{dpi, event_loop, window};
-use miroir::*;
 use nalgebra::SVector;
+use miroir::*;
 
 mod camera;
 mod renderable;
 mod sim_render_data;
-
 use sim_render_data::SimulationRenderData;
 
+pub use miroir;
 pub use glium as gl;
 pub use glium_shapes as gl_shapes;
 pub use renderable::*;
 
-/// The main vertex type used when rendering simulations,
-/// You are free to use whichever vertex type you wish, as long as their dimensions
-/// correctly match those of the simulation .
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
 pub struct Vertex<const N: usize> {
     pub position: [f32; N],
@@ -144,7 +139,7 @@ pub struct RayParams<S> {
     pub path_color: [f32 ; 4],
 }
 
-impl<S: FloatCore + 'static> Default for RayParams<S>
+impl<S: Copy + 'static> Default for RayParams<S>
 where
     f64: AsPrimitive<S>,
 {

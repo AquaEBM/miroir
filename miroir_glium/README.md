@@ -46,7 +46,7 @@ To include this crate as a dependency in your project, just add it to the `[depe
 miroir_glium = { git = "https://github.com/AquaEBM/miroir" }
 ```
 
-This crate already re-exports [`glium`](https://crates.io/crates/glium/) for convenience, and to avoid dependency synchronisation issues.
+This crate already re-exports [`glium`](https://crates.io/crates/glium/) and [`miroir`](../miroir_core) for convenience, and to avoid dependency synchronisation issues.
 
 ### TODOs
 

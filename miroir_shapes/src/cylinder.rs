@@ -1,5 +1,4 @@
 use arrayvec::ArrayVec;
-use nalgebra::RealField;
 
 use super::*;
 
@@ -124,5 +123,68 @@ impl<S: RealField> Mirror<Unit<SVector<S, 3>>> for Cylinder<S> {
         ctx: SimulationCtx<S>,
     ) -> Option<Intersection<Unit<SVector<S, 3>>>> {
         ctx.closest(self.tangents_at_intersections(ray))
+    }
+}
+
+#[cfg(feature = "miroir_glium")]
+struct CylinderRenderData {
+    vertices: gl::VertexBuffer<Vertex3D>,
+}
+
+#[cfg(feature = "miroir_glium")]
+impl RenderData for CylinderRenderData {
+    fn vertices(&self) -> gl::vertex::VerticesSource {
+        (&self.vertices).into()
+    }
+
+    fn indices(&self) -> gl::index::IndicesSource {
+        gl::index::IndicesSource::NoIndices {
+            primitives: gl::index::PrimitiveType::TriangleStrip,
+        }
+    }
+}
+
+#[cfg(feature = "miroir_glium")]
+impl<S: RealField + AsPrimitive<f32>> OpenGLRenderable for Cylinder<S> {
+    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
+        const NUM_POINTS: usize = 360;
+
+        let d = self.segment_dist().map(|v| v.as_());
+
+        let d_norm = d.normalize();
+
+        let v = nalgebra::SVector::from([0., 0., 1.]) + d_norm;
+
+        // Rotation matrix to rotate the circle so it faces the axis formed by our line segment
+        // specifically it is the orthogonal matrix that maps the unit `z` vector `a = [0, 0, 1]`
+        // to a unit vector `b`, let `v = a + b`, and vT be the transpose of v, also,
+        // let `O = (v * vT) / (vT * v), or v ⊗ v / <v, v>` (outer product over inner product)
+        // Then, `R = 2 * O - Id`
+        // TODO: use `nalgebra::Rotation`
+        let id = nalgebra::SMatrix::identity();
+        let o = nalgebra::SMatrix::from_fn(|i, j| v[i] * v[j]);
+        let rot = 2.0 / v.norm_squared() * o - id;
+
+        let r = self.radius().as_();
+        let start = self.start().map(|s| s.as_());
+
+        use core::f32::consts::TAU;
+
+        const NUM_VERTICES: usize = (NUM_POINTS + 1) * 2;
+
+        let mut vertices: [_; NUM_VERTICES] = [Default::default(); NUM_VERTICES];
+
+        vertices.chunks_exact_mut(2).enumerate().for_each(|(i, w)| {
+            let [a, b] = w else { unreachable!() };
+
+            let [x, y]: [f32; 2] = (i as f32 / NUM_POINTS as f32 * TAU).sin_cos().into();
+            let vertex = [x * r, y * r, 0.];
+            let k = rot * nalgebra::SVector::from(vertex) + start;
+            (*a, *b) = (k.into(), (k + d).into())
+        });
+
+        let vertices = gl::VertexBuffer::immutable(display, vertices.as_slice()).unwrap();
+
+        list.push(Box::new(CylinderRenderData { vertices }))
     }
 }

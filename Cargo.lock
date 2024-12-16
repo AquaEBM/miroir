@@ -852,6 +852,9 @@ version = "0.1.0"
 dependencies = [
  "arrayvec 0.7.6",
  "miroir",
+ "miroir_glium",
+ "miroir_numworks",
+ "num-traits",
 ]
 
 [[package]]

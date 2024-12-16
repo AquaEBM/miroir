@@ -118,10 +118,11 @@ impl<S: RealField> Cylinder<S> {
 }
 
 impl<S: RealField> Mirror<Unit<SVector<S, 3>>> for Cylinder<S> {
-    fn add_tangents(
+    fn closest_intersection(
         &self,
-        ctx: &SimulationCtx<SVector<S, 3>>,
+        ray: &Ray<SVector<S, 3>>,
+        ctx: SimulationCtx<S>,
     ) -> Option<Intersection<Unit<SVector<S, 3>>>> {
-        ctx.closest(self.tangents_at_intersections(ctx.ray))
+        ctx.closest(self.tangents_at_intersections(ray))
     }
 }

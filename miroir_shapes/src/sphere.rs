@@ -78,14 +78,11 @@ impl<S: ComplexField, const D: usize> Sphere<S, D> {
 }
 
 impl<S: RealField, const D: usize> Mirror<Unit<SVector<S, D>>> for Sphere<S, D> {
-    fn add_tangents(
+    fn closest_intersection(
         &self,
-        ctx: &SimulationCtx<SVector<S, D>>,
+        ray: &Ray<SVector<S, D>>,
+        ctx: SimulationCtx<S>,
     ) -> Option<Intersection<Unit<SVector<S, D>>>> {
-        ctx.closest(
-            self.tangents_at_intersections(ctx.ray)
-                .into_iter()
-                .flatten(),
-        )
+        ctx.closest(self.tangents_at_intersections(ray).into_iter().flatten())
     }
 }

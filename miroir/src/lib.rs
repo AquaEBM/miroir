@@ -7,8 +7,9 @@ use alloc::{boxed::Box, rc::Rc, sync::Arc, vec::Vec};
 pub use either;
 use either::Either;
 
-use core::{convert::identity, ops::Deref};
+use core::{convert::identity as id, ops::Deref};
 
+#[cfg(feature = "nalgebra")]
 mod nalg;
 #[cfg(feature = "nalgebra")]
 pub use nalg::*;
@@ -18,7 +19,7 @@ pub trait Vector {
 }
 
 pub trait VMulAdd: Vector {
-   fn mul_add(&self, t: Self::Scalar, other: &Self) -> Self
+    fn mul_add(&self, t: Self::Scalar, other: &Self) -> Self
     where
         Self: Sized;
 }
@@ -87,8 +88,8 @@ impl<V: Vector> Ray<V> {
         mirror: &(impl Mirror<H> + ?Sized),
         eps: &V::Scalar,
     ) -> Option<(Scalar<H>, H)> {
-        let ctx = SimulationCtx::new(self, eps);
-        mirror.add_tangents(&ctx).map(Into::into)
+        let ctx = SimulationCtx::new(eps);
+        mirror.closest_intersection(self, ctx).map(Into::into)
     }
 }
 
@@ -130,22 +131,30 @@ impl<H: Hyperplane> Intersection<H> {
     }
 }
 
-pub struct SimulationCtx<'a, V: Vector> {
-    pub ray: &'a Ray<V>,
-    eps: &'a V::Scalar,
+#[derive(Debug)]
+pub struct SimulationCtx<'a, S> {
+    eps: &'a S,
 }
 
-impl<'a, V: Vector> SimulationCtx<'a, V> {
+impl<S> Clone for SimulationCtx<'_, S> {
+    fn clone(&self) -> Self {
+        Self { eps: self.eps }
+    }
+}
+
+impl<S> Copy for SimulationCtx<'_, S> {}
+
+impl<'a, S> SimulationCtx<'a, S> {
     #[inline]
     #[must_use]
-    fn new(ray: &'a Ray<V>, eps: &'a V::Scalar) -> Self {
-        Self { ray, eps }
+    fn new(eps: &'a S) -> Self {
+        Self { eps }
     }
 
     #[inline]
     #[must_use]
-    pub fn closest<H: Hyperplane<Vector = V>>(
-        &self,
+    pub fn closest<H: Hyperplane<Vector: Vector<Scalar = S>>>(
+        self,
         tangents: impl IntoIterator<Item = (Scalar<H>, H)>,
     ) -> Option<Intersection<H>>
     where
@@ -160,16 +169,28 @@ impl<'a, V: Vector> SimulationCtx<'a, V> {
 }
 
 pub trait Mirror<H: Hyperplane> {
-    fn add_tangents(&self, ctx: &SimulationCtx<H::Vector>) -> Option<Intersection<H>>;
+    fn closest_intersection(
+        &self,
+        ray: &Ray<H::Vector>,
+        ctx: SimulationCtx<Scalar<H>>,
+    ) -> Option<Intersection<H>>;
 }
 
 impl<H: Hyperplane, I: Hyperplane<Vector = H::Vector>, M: Mirror<H>, N: Mirror<I>>
     Mirror<Either<H, I>> for Either<M, N>
 {
-    fn add_tangents(&self, ctx: &SimulationCtx<H::Vector>) -> Option<Intersection<Either<H, I>>> {
+    fn closest_intersection(
+        &self,
+        ray: &Ray<H::Vector>,
+        ctx: SimulationCtx<Scalar<H>>,
+    ) -> Option<Intersection<Either<H, I>>> {
         match self {
-            Either::Left(m) => m.add_tangents(ctx).map(|i| i.map(identity, Either::Left)),
-            Either::Right(m) => m.add_tangents(ctx).map(|i| i.map(identity, Either::Right)),
+            Either::Left(m) => m
+                .closest_intersection(ray, ctx)
+                .map(|i| i.map(id, Either::Left)),
+            Either::Right(m) => m
+                .closest_intersection(ray, ctx)
+                .map(|i| i.map(id, Either::Right)),
         }
     }
 }
@@ -179,13 +200,20 @@ impl<H: Hyperplane, I: Hyperplane<Vector = H::Vector>, M: Mirror<H>, N: Mirror<I
 where
     Scalar<H>: PartialOrd,
 {
-    fn add_tangents(&self, ctx: &SimulationCtx<H::Vector>) -> Option<Intersection<Either<H, I>>> {
+    fn closest_intersection(
+        &self,
+        ray: &Ray<H::Vector>,
+        ctx: SimulationCtx<Scalar<H>>,
+    ) -> Option<Intersection<Either<H, I>>> {
         let (l, r) = self;
 
-        l.add_tangents(ctx)
-            .map(|i| i.map(identity, Either::Left))
+        l.closest_intersection(ray, ctx)
+            .map(|i| i.map(id, Either::Left))
             .into_iter()
-            .chain(r.add_tangents(ctx).map(|i| i.map(identity, Either::Right)))
+            .chain(
+                r.closest_intersection(ray, ctx)
+                    .map(|i| i.map(id, Either::Right)),
+            )
             .min_by(|i1, i2| i1.dist.partial_cmp(&i2.dist).unwrap())
     }
 }
@@ -195,10 +223,14 @@ where
     Scalar<H>: PartialOrd,
 {
     #[inline]
-    fn add_tangents(&self, ctx: &SimulationCtx<H::Vector>) -> Option<Intersection<H>> {
+    fn closest_intersection(
+        &self,
+        ray: &Ray<H::Vector>,
+        ctx: SimulationCtx<Scalar<H>>,
+    ) -> Option<Intersection<H>> {
         ctx.closest(
             self.iter()
-                .filter_map(|m| m.add_tangents(ctx))
+                .filter_map(|m| m.closest_intersection(ray, ctx))
                 .map(Into::into),
         )
     }
@@ -209,8 +241,12 @@ where
     Scalar<H>: PartialOrd,
 {
     #[inline]
-    fn add_tangents(&self, ctx: &SimulationCtx<H::Vector>) -> Option<Intersection<H>> {
-        self.as_slice().add_tangents(ctx)
+    fn closest_intersection(
+        &self,
+        ray: &Ray<H::Vector>,
+        ctx: SimulationCtx<Scalar<H>>,
+    ) -> Option<Intersection<H>> {
+        self.as_slice().closest_intersection(ray, ctx)
     }
 }
 
@@ -220,8 +256,12 @@ where
     Scalar<H>: PartialOrd,
 {
     #[inline]
-    fn add_tangents(&self, ctx: &SimulationCtx<H::Vector>) -> Option<Intersection<H>> {
-        self.deref().add_tangents(ctx)
+    fn closest_intersection(
+        &self,
+        ray: &Ray<H::Vector>,
+        ctx: SimulationCtx<Scalar<H>>,
+    ) -> Option<Intersection<H>> {
+        self.deref().closest_intersection(ray, ctx)
     }
 }
 
@@ -230,38 +270,58 @@ where
 #[cfg(feature = "alloc")]
 impl<H: Hyperplane, T: Mirror<H> + ?Sized> Mirror<H> for Box<T> {
     #[inline]
-    fn add_tangents(&self, ctx: &SimulationCtx<H::Vector>) -> Option<Intersection<H>> {
-        self.deref().add_tangents(ctx)
+    fn closest_intersection(
+        &self,
+        ray: &Ray<H::Vector>,
+        ctx: SimulationCtx<Scalar<H>>,
+    ) -> Option<Intersection<H>> {
+        self.deref().closest_intersection(ray, ctx)
     }
 }
 
 #[cfg(feature = "alloc")]
 impl<H: Hyperplane, T: Mirror<H> + ?Sized> Mirror<H> for Arc<T> {
     #[inline]
-    fn add_tangents(&self, ctx: &SimulationCtx<H::Vector>) -> Option<Intersection<H>> {
-        self.deref().add_tangents(ctx)
+    fn closest_intersection(
+        &self,
+        ray: &Ray<H::Vector>,
+        ctx: SimulationCtx<Scalar<H>>,
+    ) -> Option<Intersection<H>> {
+        self.deref().closest_intersection(ray, ctx)
     }
 }
 
 #[cfg(feature = "alloc")]
 impl<H: Hyperplane, T: Mirror<H> + ?Sized> Mirror<H> for Rc<T> {
     #[inline]
-    fn add_tangents(&self, ctx: &SimulationCtx<H::Vector>) -> Option<Intersection<H>> {
-        self.deref().add_tangents(ctx)
+    fn closest_intersection(
+        &self,
+        ray: &Ray<H::Vector>,
+        ctx: SimulationCtx<Scalar<H>>,
+    ) -> Option<Intersection<H>> {
+        self.deref().closest_intersection(ray, ctx)
     }
 }
 
 impl<H: Hyperplane, T: Mirror<H> + ?Sized> Mirror<H> for &T {
     #[inline]
-    fn add_tangents(&self, ctx: &SimulationCtx<H::Vector>) -> Option<Intersection<H>> {
+    fn closest_intersection(
+        &self,
+        ray: &Ray<H::Vector>,
+        ctx: SimulationCtx<Scalar<H>>,
+    ) -> Option<Intersection<H>> {
         #[allow(suspicious_double_ref_op)]
-        self.deref().add_tangents(ctx)
+        self.deref().closest_intersection(ray, ctx)
     }
 }
 
 impl<H: Hyperplane, T: Mirror<H> + ?Sized> Mirror<H> for &mut T {
     #[inline]
-    fn add_tangents(&self, ctx: &SimulationCtx<H::Vector>) -> Option<Intersection<H>> {
-        self.deref().add_tangents(ctx)
+    fn closest_intersection(
+        &self,
+        ray: &Ray<H::Vector>,
+        ctx: SimulationCtx<Scalar<H>>,
+    ) -> Option<Intersection<H>> {
+        self.deref().closest_intersection(ray, ctx)
     }
 }

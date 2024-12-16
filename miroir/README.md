@@ -20,17 +20,13 @@ The main idea behind this crate is the following one-method trait: (some parts o
 
 ```rust
 pub trait Mirror {
-    fn add_tangents(&self, ctx: &mut SimulationCtx);
+    fn closest_intersection(&self, ray: &Ray) -> Option<Intersection>;
 }
 ```
 
-In this method, `self` must report to `ctx` the distance(s) a given ray (accessible with `ctx.ray()`) must travel to reach a point of intersection with `self`, as well as the direction space(s) of the tangent(s) to `self` at said point(s).
+In this method, one must return the first point of intersection with `self`, that `ray` would meet when traveling straight forward.
 
-This trait is object safe, and automatically implemented for arrays, slices, (mutable) references, `{Box/Rc/Arc/Vec}`s (when the `alloc` feature is enabled) and tuples if the underlying type(s) are also `Mirror`s, making combining, seperating, sharing, and composing mirrors easy and intuitive.
-
-The `Ray` struct has a method `ray.closest_intersection(&mirror, ..)` that queries `mirror` and finds the closest one of said tangents.
-
-Finally, the `RayPath` struct is an iterator of `Ray`s, built from a ray and a mirror, that calls the aforementioned method, moves the ray forward to the closest tangent, reflects it's direction w.r.t. the tangents direction space, then yields it, repeatedly, unitl no intersections between the ray and the mirror are found.
+This trait is object safe, and automatically implemented for arrays, slices, (mutable) references, `{Box/Rc/Arc/Vec}`s (when the `alloc` feature is enabled) and tuples if the underlying type(s) are also `Mirror`s, making combining, seperating, and sharing mirrors easy and intuitive.
 
 ## Documentation
 

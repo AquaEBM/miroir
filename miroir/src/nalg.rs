@@ -246,7 +246,7 @@ impl<S: ComplexField, const D: usize> Ray<SVector<S, D>> {
     }
 }
 
-/// Checks if adding `new_pt` to `path` results in a ray doing a potential infinite loop.
+/// Checks if adding `new_pt` to `path` results in a ray doing an infinite loop.
 /// `eps` is used for comparisons.
 #[inline]
 #[must_use]

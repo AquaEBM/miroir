@@ -11,6 +11,6 @@ either = { version = "1", default-features = false }
 [features]
 
 default = ["std", "nalgebra"]
-alloc = ["nalgebra/alloc"]
-std = ["nalgebra/std", "alloc"]
-libm = ["nalgebra/libm"]
+alloc = ["nalgebra?/alloc"]
+std = ["nalgebra?/std", "alloc"]
+libm = ["nalgebra?/libm"]

@@ -134,12 +134,13 @@ impl<S: RealField, const D: usize> Simplex<S, D> {
 }
 
 impl<S: RealField, const D: usize> Mirror<HyperplaneBasisOrtho<S, D>> for Simplex<S, D> {
-    fn add_tangents(
+    fn closest_intersection(
         &self,
-        ctx: &SimulationCtx<SVector<S, D>>,
+        ray: &Ray<SVector<S, D>>,
+        ctx: SimulationCtx<S>,
     ) -> Option<Intersection<HyperplaneBasisOrtho<S, D>>> {
         ctx.closest(
-            self.intersection(ctx.ray)
+            self.intersection(ray)
                 .map(|dist| (dist, self.inner_plane_ortho().clone())),
         )
     }

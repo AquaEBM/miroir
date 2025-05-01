@@ -85,7 +85,7 @@ impl<S: RealField, const D: usize> Mirror<Unit<SVector<S, D>>> for Sphere<S, D> 
     }
 }
 
-#[cfg(feature = "miroir_glium")]
+#[cfg(feature = "glium")]
 // Use glium_shapes::sphere::Sphere for the 3D implementation
 impl<S: RealField + AsPrimitive<f32>> OpenGLRenderable for Sphere<S, 3> {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
@@ -103,12 +103,12 @@ impl<S: RealField + AsPrimitive<f32>> OpenGLRenderable for Sphere<S, 3> {
     }
 }
 
-#[cfg(feature = "miroir_glium")]
+#[cfg(feature = "glium")]
 struct Circle {
     vertices: gl::VertexBuffer<Vertex2D>,
 }
 
-#[cfg(feature = "miroir_glium")]
+#[cfg(feature = "glium")]
 impl Circle {
     fn new<const N: usize>(center: [f32; 2], radius: f32, display: &gl::Display) -> Self {
         let c = SVector::from(center);
@@ -117,7 +117,7 @@ impl Circle {
 
         let points: [_; N] = core::array::from_fn(|i| {
             let w = i as f32 / N as f32 * TAU;
-            let p = nalgebra::Vector2::new(w.cos(), w.sin());
+            let p = na::Vector2::new(w.cos(), w.sin());
             (p * radius + c).into()
         });
 
@@ -127,7 +127,7 @@ impl Circle {
     }
 }
 
-#[cfg(feature = "miroir_glium")]
+#[cfg(feature = "glium")]
 impl RenderData for Circle {
     fn vertices(&self) -> gl::vertex::VerticesSource {
         (&self.vertices).into()
@@ -140,7 +140,7 @@ impl RenderData for Circle {
     }
 }
 
-#[cfg(feature = "miroir_glium")]
+#[cfg(feature = "glium")]
 // in 2D, the list of vertices of a circle is easy to calculate
 impl<S: RealField + AsPrimitive<f32>> OpenGLRenderable for Sphere<S, 2> {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
@@ -152,7 +152,7 @@ impl<S: RealField + AsPrimitive<f32>> OpenGLRenderable for Sphere<S, 2> {
     }
 }
 
-#[cfg(feature = "miroir_numworks")]
+#[cfg(feature = "numworks")]
 impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for Sphere<S, 2> {
     fn draw(&self, color: Color) {
         draw_circle(

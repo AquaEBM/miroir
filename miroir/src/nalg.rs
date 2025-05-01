@@ -1,7 +1,8 @@
 use super::*;
 
-pub use nalgebra;
-use nalgebra::{zero, ComplexField, SMatrix, SVector, SimdComplexField, Unit};
+pub use nalgebra as na;
+use na::{zero, ComplexField, SMatrix, SVector, SimdComplexField, Unit};
+use core::ops::Deref;
 
 impl<S: SimdComplexField, const D: usize> Vector for SVector<S, D> {
     type Scalar = S;

@@ -2,7 +2,7 @@ use super::*;
 
 use core::{f32::consts::FRAC_PI_2, time::Duration};
 use glium::glutin::event::{ElementState, VirtualKeyCode};
-use nalgebra::{Matrix4, Point3, Vector3};
+use na::{Matrix4, Point3, Vector3};
 
 const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
 

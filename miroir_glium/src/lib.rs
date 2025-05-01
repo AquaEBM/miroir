@@ -1,6 +1,6 @@
 use core::{
     array,
-    ops::{Add, Deref, Mul},
+    ops::{Add, Mul},
 };
 use num_traits::AsPrimitive;
 use std::{time, collections::TryReserveError, rc::Rc, sync::Arc};
@@ -8,8 +8,8 @@ use std::{time, collections::TryReserveError, rc::Rc, sync::Arc};
 use gl::{backend::glutin::DisplayCreationError, glutin};
 
 use glutin::{dpi, event_loop, window};
-use nalgebra::SVector;
 use miroir::*;
+use na::SVector;
 
 mod camera;
 mod renderable;

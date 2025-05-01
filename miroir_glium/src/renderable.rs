@@ -100,29 +100,27 @@ impl<const N: usize, T: OpenGLRenderable> OpenGLRenderable for [T; N] {
     }
 }
 
-// It's clear that all these impls use the `Deref` trait, but writing a blanket impl over all
-// types implementing `Deref` makes the trait unusable downstream
 impl<T: OpenGLRenderable + ?Sized> OpenGLRenderable for Box<T> {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        self.deref().append_render_data(display, list);
+        self.as_ref().append_render_data(display, list);
     }
 }
 
 impl<T: OpenGLRenderable + ?Sized> OpenGLRenderable for Arc<T> {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        self.deref().append_render_data(display, list);
+        self.as_ref().append_render_data(display, list);
     }
 }
 
 impl<T: OpenGLRenderable + ?Sized> OpenGLRenderable for Rc<T> {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        self.deref().append_render_data(display, list);
+        self.as_ref().append_render_data(display, list);
     }
 }
 
 impl<T: OpenGLRenderable> OpenGLRenderable for Vec<T> {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        self.deref().append_render_data(display, list);
+        self.as_slice().append_render_data(display, list);
     }
 }
 
@@ -134,6 +132,6 @@ impl<T: OpenGLRenderable + ?Sized> OpenGLRenderable for &T {
 
 impl<T: OpenGLRenderable + ?Sized> OpenGLRenderable for &mut T {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        self.deref().append_render_data(display, list);
+        (*self as &T).append_render_data(display, list);
     }
 }

@@ -19,4 +19,4 @@ glium_shapes = { git = "https://github.com/FlashOnFire/glium_shapes.git", branch
 
 [dev-dependencies]
 
-miroir_shapes = { path = "../miroir_shapes", features = ["miroir_glium"] }
+miroir_shapes = { path = "../miroir_shapes", features = ["glium"] }

@@ -19,4 +19,4 @@ alloc = ["miroir/alloc"]
 
 [dev-dependencies]
 
-miroir_shapes = { path = "../miroir_shapes", features = ["miroir_numworks"] }
+miroir_shapes = { path = "../miroir_shapes", features = ["numworks"] }

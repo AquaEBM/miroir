@@ -144,12 +144,12 @@ impl<S: RealField, const D: usize> Mirror<HyperplaneBasisOrtho<S, D>> for Simple
     }
 }
 
-#[cfg(feature = "miroir_glium")]
+#[cfg(feature = "glium")]
 struct SimplexRenderData<const D: usize> {
     vertices: gl::VertexBuffer<Vertex<D>>,
 }
 
-#[cfg(feature = "miroir_glium")]
+#[cfg(feature = "glium")]
 impl<const D: usize> RenderData for SimplexRenderData<D> {
     fn vertices(&self) -> gl::vertex::VerticesSource {
         (&self.vertices).into()
@@ -166,7 +166,7 @@ impl<const D: usize> RenderData for SimplexRenderData<D> {
     }
 }
 
-#[cfg(feature = "miroir_glium")]
+#[cfg(feature = "glium")]
 impl<S, const D: usize> OpenGLRenderable for Simplex<S, D>
 where
     Vertex<D>: gl::Vertex + From<SVector<S, D>>,
@@ -181,7 +181,7 @@ where
     }
 }
 
-#[cfg(feature = "miroir_numworks")]
+#[cfg(feature = "numworks")]
 impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for LineSegment<S> {
     fn draw(&self, color: Color) {
         let [start, end] = self.vertices();

@@ -1,11 +1,10 @@
-use core::f32::consts::{FRAC_PI_2, PI};
 
 use super::*;
 
+use core::f32::consts::{FRAC_PI_2, PI};
 use camera::{Camera, CameraController};
-
 use gl::index::{NoIndices, PrimitiveType};
-use nalgebra::{Perspective3, Point3};
+use na::{Perspective3, Point3};
 const LINE_STRIP: NoIndices = NoIndices(PrimitiveType::LineStrip);
 
 struct RayPath<V: Copy> {

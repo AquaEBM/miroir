@@ -63,9 +63,9 @@ fn main() {
 
     // coordinates of screen corners
     const TOP_LEFT: [f32; 2] = [0., 18.];
-    const BOTTOM_RIGHT: [f32; 2] = [319., 239.];
-    const BOTTOM_LEFT: [f32; 2] = [0., 239.];
-    const TOP_RIGHT: [f32; 2] = [319., 18.];
+    const BOTTOM_RIGHT: [f32; 2] = [320., 240.];
+    const BOTTOM_LEFT: [f32; 2] = [0., 240.];
+    const TOP_RIGHT: [f32; 2] = [320., 18.];
     const CENTER: [f32; 2] = [160., 129.];
 
     let mirrors = (

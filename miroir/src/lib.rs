@@ -7,7 +7,7 @@ use alloc::{boxed::Box, rc::Rc, sync::Arc, vec::Vec};
 pub use either;
 use either::Either;
 
-use core::{convert::identity as id, ops::Deref};
+use core::convert::identity as id;
 
 #[cfg(feature = "nalgebra")]
 mod nalg;
@@ -261,12 +261,10 @@ where
         ray: &Ray<H::Vector>,
         ctx: SimulationCtx<Scalar<H>>,
     ) -> Option<Intersection<H>> {
-        self.deref().closest_intersection(ray, ctx)
+        self.as_slice().closest_intersection(ray, ctx)
     }
 }
 
-// It's clear that all these impls use the `Deref` trait, but writing a blanket impl over all
-// types implementing `Deref` makes it impossible to implement it for new types downstream.
 #[cfg(feature = "alloc")]
 impl<H: Hyperplane, T: Mirror<H> + ?Sized> Mirror<H> for Box<T> {
     #[inline]
@@ -275,7 +273,7 @@ impl<H: Hyperplane, T: Mirror<H> + ?Sized> Mirror<H> for Box<T> {
         ray: &Ray<H::Vector>,
         ctx: SimulationCtx<Scalar<H>>,
     ) -> Option<Intersection<H>> {
-        self.deref().closest_intersection(ray, ctx)
+        self.as_ref().closest_intersection(ray, ctx)
     }
 }
 
@@ -287,7 +285,7 @@ impl<H: Hyperplane, T: Mirror<H> + ?Sized> Mirror<H> for Arc<T> {
         ray: &Ray<H::Vector>,
         ctx: SimulationCtx<Scalar<H>>,
     ) -> Option<Intersection<H>> {
-        self.deref().closest_intersection(ray, ctx)
+        self.as_ref().closest_intersection(ray, ctx)
     }
 }
 
@@ -299,7 +297,7 @@ impl<H: Hyperplane, T: Mirror<H> + ?Sized> Mirror<H> for Rc<T> {
         ray: &Ray<H::Vector>,
         ctx: SimulationCtx<Scalar<H>>,
     ) -> Option<Intersection<H>> {
-        self.deref().closest_intersection(ray, ctx)
+        self.as_ref().closest_intersection(ray, ctx)
     }
 }
 
@@ -311,7 +309,7 @@ impl<H: Hyperplane, T: Mirror<H> + ?Sized> Mirror<H> for &T {
         ctx: SimulationCtx<Scalar<H>>,
     ) -> Option<Intersection<H>> {
         #[allow(suspicious_double_ref_op)]
-        self.deref().closest_intersection(ray, ctx)
+        (*self).closest_intersection(ray, ctx)
     }
 }
 
@@ -322,6 +320,6 @@ impl<H: Hyperplane, T: Mirror<H> + ?Sized> Mirror<H> for &mut T {
         ray: &Ray<H::Vector>,
         ctx: SimulationCtx<Scalar<H>>,
     ) -> Option<Intersection<H>> {
-        self.deref().closest_intersection(ray, ctx)
+        (*self as &T).closest_intersection(ray, ctx)
     }
 }

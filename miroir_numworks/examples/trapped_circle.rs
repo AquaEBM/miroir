@@ -15,18 +15,18 @@ use miroir_numworks::{
 use miroir_shapes::{LineSegment, Sphere};
 
 #[used]
-#[link_section = ".rodata.eadk_app_name"]
+#[unsafe(link_section = ".rodata.eadk_app_name")]
 static APP_NAME: [u8; 15] = *b"Trapped Circle\0";
 
 #[used]
-#[link_section = ".rodata.eadk_api_level"]
+#[unsafe(link_section = ".rodata.eadk_api_level")]
 static API_LEVEL: u32 = 0;
 
 #[used]
-#[link_section = ".rodata.eadk_app_icon"]
+#[unsafe(link_section = ".rodata.eadk_app_icon")]
 static ICON: [u8; 4250] = *include_bytes!("icon.nwi");
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main() {
     fill_rect(
         Rect {

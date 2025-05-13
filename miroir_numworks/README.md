@@ -9,7 +9,7 @@ Examples of simulations you can run (and how to create them) can be found in the
 First, build the app with the following command:
 
 ```shell
-cargo rustc build -r --example <example_name> --target=thumbv7em-none-eabihf -- -Clink-arg=--relocatable -Clink-arg=-no-gc-sections
+cargo rustc build -r --example <example_name>
 ```
 
 Where `<example_name>` is the name of the example's source file, without the trailing `.rs`.
@@ -19,7 +19,7 @@ Then, check out the last step in the instructions in [`eadk_rs`](https://github.
 Here are some videos of some simulations being run on the calculator:
 
 [`trapped_circle.rs`](examples/trapped_circle.rs) (Slowed down, with a timing parameter, for visibility)
-https://github.com/AquaEBM/miroir/assets/79016373/e7fd62c3-1bdd-4d6c-a17b-de3517f60b39
+[link](https://github.com/AquaEBM/miroir/assets/79016373/e7fd62c3-1bdd-4d6c-a17b-de3517f60b39)
 
 ## Documentation
 

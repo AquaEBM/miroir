@@ -129,11 +129,11 @@ impl Circle {
 
 #[cfg(feature = "glium")]
 impl RenderData for Circle {
-    fn vertices(&self) -> gl::vertex::VerticesSource {
+    fn vertices(&self) -> gl::vertex::VerticesSource<'_> {
         (&self.vertices).into()
     }
 
-    fn indices(&self) -> gl::index::IndicesSource {
+    fn indices(&self) -> gl::index::IndicesSource<'_> {
         gl::index::IndicesSource::NoIndices {
             primitives: gl::index::PrimitiveType::LineLoop,
         }

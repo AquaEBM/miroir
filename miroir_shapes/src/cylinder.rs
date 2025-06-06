@@ -133,11 +133,11 @@ struct CylinderRenderData {
 
 #[cfg(feature = "glium")]
 impl RenderData for CylinderRenderData {
-    fn vertices(&self) -> gl::vertex::VerticesSource {
+    fn vertices(&self) -> gl::vertex::VerticesSource<'_> {
         (&self.vertices).into()
     }
 
-    fn indices(&self) -> gl::index::IndicesSource {
+    fn indices(&self) -> gl::index::IndicesSource<'_> {
         gl::index::IndicesSource::NoIndices {
             primitives: gl::index::PrimitiveType::TriangleStrip,
         }

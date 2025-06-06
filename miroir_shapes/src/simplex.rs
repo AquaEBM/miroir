@@ -151,11 +151,11 @@ struct SimplexRenderData<const D: usize> {
 
 #[cfg(feature = "glium")]
 impl<const D: usize> RenderData for SimplexRenderData<D> {
-    fn vertices(&self) -> gl::vertex::VerticesSource {
+    fn vertices(&self) -> gl::vertex::VerticesSource<'_> {
         (&self.vertices).into()
     }
 
-    fn indices(&self) -> gl::index::IndicesSource {
+    fn indices(&self) -> gl::index::IndicesSource<'_> {
         gl::index::IndicesSource::NoIndices {
             primitives: match D {
                 0 => unreachable!("dimension must not be zero"),

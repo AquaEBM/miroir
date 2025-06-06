@@ -209,22 +209,11 @@ impl<S: SimdComplexField, const D: usize> Hyperplane for HyperplaneBasisOrtho<S,
     }
 }
 
-impl<V> Ray<V> {
-    #[inline]
-    #[must_use]
-    pub fn new_unchecked_dir(pos: impl Into<V>, dir: impl Into<V>) -> Self {
-        Self {
-            pos: pos.into(),
-            dir: dir.into(),
-        }
-    }
-}
-
 impl<S, const D: usize> Ray<SVector<S, D>> {
     #[inline]
     #[must_use]
     pub fn new_unit_dir(pos: impl Into<SVector<S, D>>, dir: Unit<SVector<S, D>>) -> Self {
-        Self::new_unchecked_dir(pos, dir.into_inner())
+        Self::new(pos, dir.into_inner())
     }
 }
 

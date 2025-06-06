@@ -11,11 +11,11 @@ pub trait RenderData {
 
 /// glium_shapes 3D convenience blanket impl
 impl RenderData for glium_shapes::sphere::Sphere {
-    fn vertices(&self) -> gl::vertex::VerticesSource {
+    fn vertices(&self) -> gl::vertex::VerticesSource<'_> {
         self.into()
     }
 
-    fn indices(&self) -> gl::index::IndicesSource {
+    fn indices(&self) -> gl::index::IndicesSource<'_> {
         self.into()
     }
 }

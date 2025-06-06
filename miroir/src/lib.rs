@@ -142,8 +142,6 @@ impl<S> Clone for SimulationCtx<'_, S> {
     }
 }
 
-impl<S> Copy for SimulationCtx<'_, S> {}
-
 impl<'a, S> SimulationCtx<'a, S> {
     #[inline]
     #[must_use]
@@ -154,7 +152,7 @@ impl<'a, S> SimulationCtx<'a, S> {
     #[inline]
     #[must_use]
     pub fn closest<H: Hyperplane<Vector: Vector<Scalar = S>>>(
-        self,
+        &self,
         tangents: impl IntoIterator<Item = (Scalar<H>, H)>,
     ) -> Option<Intersection<H>>
     where
@@ -184,7 +182,8 @@ impl<H: Hyperplane, I: Hyperplane<Vector = H::Vector>, M: Mirror<H>, N: Mirror<I
         ray: &Ray<H::Vector>,
         ctx: SimulationCtx<Scalar<H>>,
     ) -> Option<Intersection<Either<H, I>>> {
-        match self {
+
+        match self.as_ref() {
             Either::Left(m) => m
                 .closest_intersection(ray, ctx)
                 .map(|i| i.map(id, Either::Left)),
@@ -207,7 +206,7 @@ where
     ) -> Option<Intersection<Either<H, I>>> {
         let (l, r) = self;
 
-        l.closest_intersection(ray, ctx)
+        l.closest_intersection(ray, ctx.clone())
             .map(|i| i.map(id, Either::Left))
             .into_iter()
             .chain(
@@ -230,7 +229,7 @@ where
     ) -> Option<Intersection<H>> {
         ctx.closest(
             self.iter()
-                .filter_map(|m| m.closest_intersection(ray, ctx))
+                .filter_map(|m| m.closest_intersection(ray, ctx.clone()))
                 .map(Into::into),
         )
     }

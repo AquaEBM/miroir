@@ -1,7 +1,7 @@
 #![no_std]
 
 use eadk::kandinsky;
-use miroir::{either::Either, Hyperplane, Mirror, Ray, Scalar, VMulAdd};
+use miroir::{either::Either, Reflector, Mirror, Ray, Scalar, VMulAdd};
 use num_traits::AsPrimitive;
 
 #[cfg(feature = "alloc")]
@@ -141,14 +141,14 @@ impl Default for SimulationParams {
     }
 }
 
-pub fn display_simulation<H: Hyperplane>(
-    mirror: &(impl Mirror<H> + KandinskyRenderable + ?Sized),
-    rays: impl IntoIterator<Item = (Ray<H::Vector>, RayParams<Scalar<H>>)>,
+pub fn display_simulation<R: Reflector>(
+    mirror: &(impl Mirror<R> + KandinskyRenderable + ?Sized),
+    rays: impl IntoIterator<Item = (Ray<R::Vector>, RayParams<Scalar<R>>)>,
     params: SimulationParams,
 ) where
-    H::Vector: VMulAdd + ToPoint,
-    Scalar<H>: 'static + Copy,
-    f64: AsPrimitive<Scalar<H>>,
+    R::Vector: VMulAdd + ToPoint,
+    Scalar<R>: 'static + Copy,
+    f64: AsPrimitive<Scalar<R>>,
 {
     mirror.draw(params.mirror_color);
 

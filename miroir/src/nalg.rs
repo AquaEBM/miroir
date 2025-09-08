@@ -18,7 +18,7 @@ impl<S: SimdComplexField, const D: usize> VMulAdd for SVector<S, D> {
     }
 }
 
-impl<S: SimdComplexField, const D: usize> Hyperplane for Unit<SVector<S, D>> {
+impl<S: SimdComplexField, const D: usize> Reflector for Unit<SVector<S, D>> {
     type Vector = SVector<S, D>;
 
     #[inline]
@@ -194,7 +194,7 @@ impl<S: SimdComplexField, const D: usize> HyperplaneBasisOrtho<S, D> {
     }
 }
 
-impl<S: SimdComplexField, const D: usize> Hyperplane for HyperplaneBasisOrtho<S, D> {
+impl<S: SimdComplexField, const D: usize> Reflector for HyperplaneBasisOrtho<S, D> {
     type Vector = SVector<S, D>;
 
     #[inline]

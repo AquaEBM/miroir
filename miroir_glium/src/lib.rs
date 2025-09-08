@@ -190,14 +190,14 @@ impl SimulationWindow {
     }
 
     #[inline]
-    pub fn display<H: Hyperplane<Vector: Vector + VMulAdd + ToGLVertex + 'static>>(
+    pub fn display<R: Reflector<Vector: Vector + VMulAdd + ToGLVertex + 'static>>(
         self,
-        mirror: &(impl Mirror<H> + OpenGLRenderable + ?Sized),
-        rays: impl IntoIterator<Item = (Ray<H::Vector>, RayParams<Scalar<H>>)>,
+        mirror: &(impl Mirror<R> + OpenGLRenderable + ?Sized),
+        rays: impl IntoIterator<Item = (Ray<R::Vector>, RayParams<Scalar<R>>)>,
         params: SimulationParams,
     ) where
-        Scalar<H>: Copy + 'static,
-        f64: AsPrimitive<Scalar<H>>,
+        Scalar<R>: Copy + 'static,
+        f64: AsPrimitive<Scalar<R>>,
     {
         let Self {
             events_loop,

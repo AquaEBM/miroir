@@ -24,14 +24,14 @@ pub trait VMulAdd: Vector {
         Self: Sized;
 }
 
-pub trait Hyperplane {
+pub trait Reflector {
     type Vector: Vector;
 
     fn reflect(&self, v: &mut Self::Vector);
 }
 
-impl<H: Hyperplane, I: Hyperplane<Vector = H::Vector>> Hyperplane for Either<H, I> {
-    type Vector = H::Vector;
+impl<R1: Reflector, R2: Reflector<Vector = R1::Vector>> Reflector for Either<R1, R2> {
+    type Vector = R1::Vector;
 
     fn reflect(&self, v: &mut Self::Vector) {
         match self {
@@ -41,7 +41,7 @@ impl<H: Hyperplane, I: Hyperplane<Vector = H::Vector>> Hyperplane for Either<H, 
     }
 }
 
-pub type Scalar<T> = <<T as Hyperplane>::Vector as Vector>::Scalar;
+pub type Scalar<T> = <<T as Reflector>::Vector as Vector>::Scalar;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ray<V> {
@@ -62,7 +62,7 @@ impl<V> Ray<V> {
 
 impl<V: Vector> Ray<V> {
     #[inline]
-    pub fn reflect_dir(&mut self, dir: &(impl Hyperplane<Vector = V> + ?Sized)) {
+    pub fn reflect_dir(&mut self, dir: &(impl Reflector<Vector = V> + ?Sized)) {
         dir.reflect(&mut self.dir);
     }
 
@@ -83,11 +83,11 @@ impl<V: Vector> Ray<V> {
     /// to make sure `ray` doesn't ignore an intersection it shouldn't.
     #[inline]
     #[must_use]
-    pub fn closest_intersection<H: Hyperplane<Vector = V>>(
+    pub fn closest_intersection<R: Reflector<Vector = V>>(
         &self,
-        mirror: &(impl Mirror<H> + ?Sized),
+        mirror: &(impl Mirror<R> + ?Sized),
         eps: &V::Scalar,
-    ) -> Option<(Scalar<H>, H)> {
+    ) -> Option<(Scalar<R>, R)> {
         let ctx = SimulationCtx::new(eps);
         mirror.closest_intersection(self, ctx).map(Into::into)
     }
@@ -105,24 +105,24 @@ impl<V: VMulAdd> Ray<V> {
     }
 }
 
-pub struct Intersection<H: Hyperplane> {
-    dist: Scalar<H>,
-    dir: H,
+pub struct Intersection<R: Reflector> {
+    dist: Scalar<R>,
+    dir: R,
 }
 
-impl<H: Hyperplane> From<Intersection<H>> for (Scalar<H>, H) {
-    fn from(Intersection { dist, dir }: Intersection<H>) -> Self {
+impl<R: Reflector> From<Intersection<R>> for (Scalar<R>, R) {
+    fn from(Intersection { dist, dir }: Intersection<R>) -> Self {
         (dist, dir)
     }
 }
 
-impl<H: Hyperplane> Intersection<H> {
+impl<R: Reflector> Intersection<R> {
     #[inline]
-    pub fn map<I: Hyperplane>(
+    pub fn map<R2: Reflector>(
         self,
-        fdist: impl FnOnce(Scalar<H>) -> Scalar<I>,
-        fdir: impl FnOnce(H) -> I,
-    ) -> Intersection<I> {
+        fdist: impl FnOnce(Scalar<R>) -> Scalar<R2>,
+        fdir: impl FnOnce(R) -> R2,
+    ) -> Intersection<R2> {
         let Intersection { dist, dir } = self;
         Intersection {
             dist: fdist(dist),
@@ -151,12 +151,12 @@ impl<'a, S> SimulationCtx<'a, S> {
 
     #[inline]
     #[must_use]
-    pub fn closest<H: Hyperplane<Vector: Vector<Scalar = S>>>(
+    pub fn closest<R: Reflector<Vector: Vector<Scalar = S>>>(
         &self,
-        tangents: impl IntoIterator<Item = (Scalar<H>, H)>,
-    ) -> Option<Intersection<H>>
+        tangents: impl IntoIterator<Item = (Scalar<R>, R)>,
+    ) -> Option<Intersection<R>>
     where
-        Scalar<H>: PartialOrd,
+        Scalar<R>: PartialOrd,
     {
         tangents
             .into_iter()
@@ -166,22 +166,22 @@ impl<'a, S> SimulationCtx<'a, S> {
     }
 }
 
-pub trait Mirror<H: Hyperplane> {
+pub trait Mirror<R: Reflector> {
     fn closest_intersection(
         &self,
-        ray: &Ray<H::Vector>,
-        ctx: SimulationCtx<Scalar<H>>,
-    ) -> Option<Intersection<H>>;
+        ray: &Ray<R::Vector>,
+        ctx: SimulationCtx<Scalar<R>>,
+    ) -> Option<Intersection<R>>;
 }
 
-impl<H: Hyperplane, I: Hyperplane<Vector = H::Vector>, M: Mirror<H>, N: Mirror<I>>
-    Mirror<Either<H, I>> for Either<M, N>
+impl<R1: Reflector, R2: Reflector<Vector = R1::Vector>, M: Mirror<R1>, N: Mirror<R2>>
+    Mirror<Either<R1, R2>> for Either<M, N>
 {
     fn closest_intersection(
         &self,
-        ray: &Ray<H::Vector>,
-        ctx: SimulationCtx<Scalar<H>>,
-    ) -> Option<Intersection<Either<H, I>>> {
+        ray: &Ray<R1::Vector>,
+        ctx: SimulationCtx<Scalar<R1>>,
+    ) -> Option<Intersection<Either<R1, R2>>> {
 
         match self.as_ref() {
             Either::Left(m) => m
@@ -194,16 +194,16 @@ impl<H: Hyperplane, I: Hyperplane<Vector = H::Vector>, M: Mirror<H>, N: Mirror<I
     }
 }
 
-impl<H: Hyperplane, I: Hyperplane<Vector = H::Vector>, M: Mirror<H>, N: Mirror<I>>
-    Mirror<Either<H, I>> for (M, N)
+impl<R1: Reflector, R2: Reflector<Vector = R1::Vector>, M: Mirror<R1>, N: Mirror<R2>>
+    Mirror<Either<R1, R2>> for (M, N)
 where
-    Scalar<H>: PartialOrd,
+    Scalar<R1>: PartialOrd,
 {
     fn closest_intersection(
         &self,
-        ray: &Ray<H::Vector>,
-        ctx: SimulationCtx<Scalar<H>>,
-    ) -> Option<Intersection<Either<H, I>>> {
+        ray: &Ray<R1::Vector>,
+        ctx: SimulationCtx<Scalar<R1>>,
+    ) -> Option<Intersection<Either<R1, R2>>> {
         let (l, r) = self;
 
         l.closest_intersection(ray, ctx.clone())
@@ -217,16 +217,16 @@ where
     }
 }
 
-impl<H: Hyperplane, T: Mirror<H>> Mirror<H> for [T]
+impl<R: Reflector, T: Mirror<R>> Mirror<R> for [T]
 where
-    Scalar<H>: PartialOrd,
+    Scalar<R>: PartialOrd,
 {
     #[inline]
     fn closest_intersection(
         &self,
-        ray: &Ray<H::Vector>,
-        ctx: SimulationCtx<Scalar<H>>,
-    ) -> Option<Intersection<H>> {
+        ray: &Ray<R::Vector>,
+        ctx: SimulationCtx<Scalar<R>>,
+    ) -> Option<Intersection<R>> {
         ctx.closest(
             self.iter()
                 .filter_map(|m| m.closest_intersection(ray, ctx.clone()))
@@ -235,90 +235,90 @@ where
     }
 }
 
-impl<H: Hyperplane, T: Mirror<H>, const N: usize> Mirror<H> for [T; N]
+impl<R: Reflector, T: Mirror<R>, const N: usize> Mirror<R> for [T; N]
 where
-    Scalar<H>: PartialOrd,
+    Scalar<R>: PartialOrd,
 {
     #[inline]
     fn closest_intersection(
         &self,
-        ray: &Ray<H::Vector>,
-        ctx: SimulationCtx<Scalar<H>>,
-    ) -> Option<Intersection<H>> {
+        ray: &Ray<R::Vector>,
+        ctx: SimulationCtx<Scalar<R>>,
+    ) -> Option<Intersection<R>> {
         self.as_slice().closest_intersection(ray, ctx)
     }
 }
 
 #[cfg(feature = "alloc")]
-impl<H: Hyperplane, T: Mirror<H>> Mirror<H> for Vec<T>
+impl<R: Reflector, T: Mirror<R>> Mirror<R> for Vec<T>
 where
-    Scalar<H>: PartialOrd,
+    Scalar<R>: PartialOrd,
 {
     #[inline]
     fn closest_intersection(
         &self,
-        ray: &Ray<H::Vector>,
-        ctx: SimulationCtx<Scalar<H>>,
-    ) -> Option<Intersection<H>> {
+        ray: &Ray<R::Vector>,
+        ctx: SimulationCtx<Scalar<R>>,
+    ) -> Option<Intersection<R>> {
         self.as_slice().closest_intersection(ray, ctx)
     }
 }
 
 #[cfg(feature = "alloc")]
-impl<H: Hyperplane, T: Mirror<H> + ?Sized> Mirror<H> for Box<T> {
+impl<R: Reflector, T: Mirror<R> + ?Sized> Mirror<R> for Box<T> {
     #[inline]
     fn closest_intersection(
         &self,
-        ray: &Ray<H::Vector>,
-        ctx: SimulationCtx<Scalar<H>>,
-    ) -> Option<Intersection<H>> {
+        ray: &Ray<R::Vector>,
+        ctx: SimulationCtx<Scalar<R>>,
+    ) -> Option<Intersection<R>> {
         self.as_ref().closest_intersection(ray, ctx)
     }
 }
 
 #[cfg(feature = "alloc")]
-impl<H: Hyperplane, T: Mirror<H> + ?Sized> Mirror<H> for Arc<T> {
+impl<R: Reflector, T: Mirror<R> + ?Sized> Mirror<R> for Arc<T> {
     #[inline]
     fn closest_intersection(
         &self,
-        ray: &Ray<H::Vector>,
-        ctx: SimulationCtx<Scalar<H>>,
-    ) -> Option<Intersection<H>> {
+        ray: &Ray<R::Vector>,
+        ctx: SimulationCtx<Scalar<R>>,
+    ) -> Option<Intersection<R>> {
         self.as_ref().closest_intersection(ray, ctx)
     }
 }
 
 #[cfg(feature = "alloc")]
-impl<H: Hyperplane, T: Mirror<H> + ?Sized> Mirror<H> for Rc<T> {
+impl<R: Reflector, T: Mirror<R> + ?Sized> Mirror<R> for Rc<T> {
     #[inline]
     fn closest_intersection(
         &self,
-        ray: &Ray<H::Vector>,
-        ctx: SimulationCtx<Scalar<H>>,
-    ) -> Option<Intersection<H>> {
+        ray: &Ray<R::Vector>,
+        ctx: SimulationCtx<Scalar<R>>,
+    ) -> Option<Intersection<R>> {
         self.as_ref().closest_intersection(ray, ctx)
     }
 }
 
-impl<H: Hyperplane, T: Mirror<H> + ?Sized> Mirror<H> for &T {
+impl<R: Reflector, T: Mirror<R> + ?Sized> Mirror<R> for &T {
     #[inline]
     fn closest_intersection(
         &self,
-        ray: &Ray<H::Vector>,
-        ctx: SimulationCtx<Scalar<H>>,
-    ) -> Option<Intersection<H>> {
+        ray: &Ray<R::Vector>,
+        ctx: SimulationCtx<Scalar<R>>,
+    ) -> Option<Intersection<R>> {
         #[allow(suspicious_double_ref_op)]
         (*self).closest_intersection(ray, ctx)
     }
 }
 
-impl<H: Hyperplane, T: Mirror<H> + ?Sized> Mirror<H> for &mut T {
+impl<R: Reflector, T: Mirror<R> + ?Sized> Mirror<R> for &mut T {
     #[inline]
     fn closest_intersection(
         &self,
-        ray: &Ray<H::Vector>,
-        ctx: SimulationCtx<Scalar<H>>,
-    ) -> Option<Intersection<H>> {
+        ray: &Ray<R::Vector>,
+        ctx: SimulationCtx<Scalar<R>>,
+    ) -> Option<Intersection<R>> {
         (*self as &T).closest_intersection(ray, ctx)
     }
 }

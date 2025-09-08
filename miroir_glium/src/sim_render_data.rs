@@ -73,16 +73,16 @@ void main() {
 
 impl<V: GLSimulationVertex + 'static> SimulationRenderData<V> {
     pub(crate) fn from_simulation<
-        H: Hyperplane<Vector: VMulAdd + Vector + ToGLVertex<Vertex = V>>,
+        R: Reflector<Vector: VMulAdd + Vector + ToGLVertex<Vertex = V>>,
     >(
-        mirror: &(impl Mirror<H> + OpenGLRenderable + ?Sized),
-        rays: impl IntoIterator<Item = (Ray<H::Vector>, RayParams<Scalar<H>>)>,
+        mirror: &(impl Mirror<R> + OpenGLRenderable + ?Sized),
+        rays: impl IntoIterator<Item = (Ray<R::Vector>, RayParams<Scalar<R>>)>,
         display: &gl::Display,
         global_params: SimulationParams,
     ) -> Self
     where
-        Scalar<H>: Copy + 'static,
-        f64: AsPrimitive<Scalar<H>>,
+        Scalar<R>: Copy + 'static,
+        f64: AsPrimitive<Scalar<R>>,
     {
         let program =
             gl::Program::from_source(display, V::SHADER_SRC, FRAGMENT_SHADER_SRC, None).unwrap();

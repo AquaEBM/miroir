@@ -50,7 +50,7 @@ impl<S: RealField> Cylinder<S> {
     #[inline]
     #[must_use]
     pub fn line_segment(&self) -> [SVector<S, 3>; 2] {
-        [self.start.clone(), self.start.clone() + self.dist.clone()]
+        [self.start.clone(), &self.start + &self.dist]
     }
 
     #[inline]
@@ -156,15 +156,14 @@ impl<S: RealField + AsPrimitive<f32>> OpenGLRenderable for Cylinder<S> {
         ).unwrap();
 
         let r = self.radius().as_();
-        let start = self.start().map(|s| s.as_());
+        let start = self.start().map(AsPrimitive::as_);
 
         const NUM_POINTS: usize = 360;
         const NUM_VERTICES: usize = (NUM_POINTS + 1) * 2;
 
         let mut vertices: [_; NUM_VERTICES] = [Default::default(); NUM_VERTICES];
 
-        vertices.chunks_exact_mut(2).enumerate().for_each(|(i, w)| {
-            let [a, b] = w else { unreachable!() };
+        vertices.as_chunks_mut().0.iter_mut().enumerate().for_each(|(i, [a, b])| {
 
             use core::f32::consts::TAU;
 

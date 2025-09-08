@@ -12,7 +12,7 @@ pub use sphere::*;
 use num_traits::AsPrimitive;
 
 #[cfg(feature = "numworks")]
-use miroir_numworks::{*, eadk::kandinsky::*};
+use miroir_numworks::{self, eadk::kandinsky, ToPoint};
 
 #[cfg(feature = "glium")]
 use miroir_glium::*;

@@ -58,7 +58,6 @@ impl<S, const D: usize> Simplex<S, D> {
     /// ```ignore
     /// *self.inner_plane_mut().v0_mut() += v;
     /// ```
-    ///
     /// Effectively translates this whole simplex.
     #[inline]
     #[must_use]
@@ -90,9 +89,9 @@ where
     SVector<S, D>: AddAssign + Clone,
 {
     /// Returns the vertices of this simplex
-    ///
+    /// 
     /// # Panics
-    ///
+    /// 
     /// if `D == 0`
     #[inline]
     pub fn vertices(&self) -> [SVector<S, D>; D] {
@@ -188,9 +187,9 @@ where
 }
 
 #[cfg(feature = "numworks")]
-impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for LineSegment<S> {
-    fn draw(&self, color: Color) {
+impl<S: RealField + AsPrimitive<i16>> miroir_numworks::KandinskyRenderable for LineSegment<S> {
+    fn draw(&self, color: kandinsky::Color) {
         let [start, end] = self.vertices();
-        draw_line(start.to_point(), end.to_point(), color);
+        kandinsky::draw_line(start.to_point(), end.to_point(), color);
     }
 }

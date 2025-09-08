@@ -153,9 +153,9 @@ impl<S: RealField + AsPrimitive<f32>> OpenGLRenderable for Sphere<S, 2> {
 }
 
 #[cfg(feature = "numworks")]
-impl<S: RealField + AsPrimitive<i16>> KandinskyRenderable for Sphere<S, 2> {
-    fn draw(&self, color: Color) {
-        draw_circle(
+impl<S: RealField + AsPrimitive<i16>> miroir_numworks::KandinskyRenderable for Sphere<S, 2> {
+    fn draw(&self, color: kandinsky::Color) {
+        kandinsky::draw_circle(
             self.center.to_point(),
             self.radius().as_().unsigned_abs(),
             color,

@@ -5,8 +5,8 @@ use super::*;
 /// [`Mirror`]s implementing [`OpenGLRenderable`] return objects for this trait enabling them to be rendered
 /// on-screen in simulations.
 pub trait RenderData {
-    fn vertices(&self) -> gl::vertex::VerticesSource;
-    fn indices(&self) -> gl::index::IndicesSource;
+    fn vertices(&self) -> gl::vertex::VerticesSource<'_>;
+    fn indices(&self) -> gl::index::IndicesSource<'_>;
 }
 
 /// glium_shapes 3D convenience blanket impl

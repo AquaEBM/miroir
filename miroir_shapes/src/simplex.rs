@@ -107,7 +107,10 @@ where
 impl<S: RealField, const D: usize> Simplex<S, D> {
     /// Returns the distance `d` such that [`ray.at(d)`](Ray::at) intersects with `self`
     #[inline]
-    pub fn intersection(&self, ray: &Ray<SVector<S, D>>) -> Option<S> {
+    pub fn intersection(&self, ray: &Ray<SVector<S, D>>) -> Option<S>
+    where
+        na::Const<D>: na::DimMin<na::Const<D>, Output = na::Const<D>>,
+    {
         let p = self.inner_plane();
 
         let intersection_coords = p.intersection_coordinates(ray, p.v0());
@@ -131,7 +134,10 @@ impl<S: RealField, const D: usize> Simplex<S, D> {
     }
 }
 
-impl<S: RealField, const D: usize> Mirror<HyperplaneBasisOrtho<S, D>> for Simplex<S, D> {
+impl<S: RealField, const D: usize> Mirror<HyperplaneBasisOrtho<S, D>> for Simplex<S, D>
+where
+    na::Const<D>: na::DimMin<na::Const<D>, Output = na::Const<D>>,
+{
     fn closest_intersection(
         &self,
         ray: &Ray<SVector<S, D>>,

@@ -80,14 +80,18 @@ impl<S: ComplexField, const D: usize> HyperplaneBasis<S, D> {
         &self,
         ray: &Ray<SVector<S, D>>,
         v0: &SVector<S, D>,
-    ) -> Option<SVector<S, D>> {
+    ) -> Option<SVector<S, D>>
+    where
+        na::Const<D>: na::DimMin<na::Const<D>, Output = na::Const<D>>, 
+    {
         let mut a = SMatrix::<S, D, D>::from_columns(&self.vectors);
         a.set_column(0, &ray.dir);
+        let a = a.full_piv_lu();
 
-        a.try_inverse_mut()
-            // a now contains a^-1
+        a.is_invertible()
             .then(|| {
-                let mut v = a * (&ray.pos - v0);
+                let mut v = &ray.pos - v0;
+                a.solve_mut(&mut v);
                 let first = &mut v[0];
                 *first = -first.clone();
                 v

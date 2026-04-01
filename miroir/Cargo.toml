@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 
-nalgebra = { version = "0.33", optional = true, default-features = false }
+nalgebra = { version = "0.34", optional = true, default-features = false }
 either = { version = "1", default-features = false }
 
 [features]

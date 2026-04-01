@@ -307,7 +307,6 @@ impl<R: Reflector, T: Mirror<R> + ?Sized> Mirror<R> for &T {
         ray: &Ray<R::Vector>,
         ctx: SimulationCtx<Scalar<R>>,
     ) -> Option<Intersection<R>> {
-        #[allow(suspicious_double_ref_op)]
         (*self).closest_intersection(ray, ctx)
     }
 }

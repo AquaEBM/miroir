@@ -1,14 +1,14 @@
-
 use super::*;
 
-use core::f32::consts::{FRAC_PI_2, PI};
 use camera::{Camera, CameraController};
+use core::f32::consts::{FRAC_PI_2, PI};
 use gl::index::{NoIndices, PrimitiveType};
 use na::{Perspective3, Point3};
+
 const LINE_STRIP: NoIndices = NoIndices(PrimitiveType::LineStrip);
 
 struct RayPath<V: Copy> {
-    color: [f32 ; 4],
+    color: [f32; 4],
     non_loop_path: gl::VertexBuffer<V>,
     loop_path: Option<([f32; 4], gl::VertexBuffer<V>)>,
 }
@@ -72,9 +72,7 @@ void main() {
 }";
 
 impl<V: GLSimulationVertex + 'static> SimulationRenderData<V> {
-    pub(crate) fn from_simulation<
-        R: Reflector<Vector: VMulAdd + Vector + ToGLVertex<Vertex = V>>,
-    >(
+    pub(crate) fn from_simulation<R: Reflector<Vector: VMulAdd + Vector + ToGLVertex<Vertex = V>>>(
         mirror: &(impl Mirror<R> + OpenGLRenderable + ?Sized),
         rays: impl IntoIterator<Item = (Ray<R::Vector>, RayParams<Scalar<R>>)>,
         display: &gl::Display,
@@ -181,7 +179,6 @@ impl<V: GLSimulationVertex + 'static> SimulationRenderData<V> {
         events_loop.run(move |ev, _, control_flow| match ev {
             event::Event::WindowEvent { event, .. } => match event {
                 event::WindowEvent::CloseRequested => *control_flow = event_loop::ControlFlow::Exit,
-
                 event::WindowEvent::Resized(physical_size) => {
                     if physical_size.width > 0 && physical_size.height > 0 {
                         projection
@@ -190,45 +187,49 @@ impl<V: GLSimulationVertex + 'static> SimulationRenderData<V> {
 
                     display.gl_window().resize(physical_size);
                 }
-
-                event::WindowEvent::KeyboardInput { input, .. } => {
-                    if let Some(keycode) = input.virtual_keycode {
-                        camera_controller.process_keyboard(keycode, input.state);
-                    }
+                event::WindowEvent::KeyboardInput {
+                    input:
+                        event::KeyboardInput {
+                            virtual_keycode: Some(keycode),
+                            state,
+                            ..
+                        },
+                    ..
+                } => {
+                    camera_controller.process_keyboard(keycode, state);
                 }
-
-                event::WindowEvent::MouseInput { button, state, .. } => {
-                    if button == event::MouseButton::Left {
-                        match state {
-                            event::ElementState::Pressed => {
-                                mouse_pressed = true;
+                event::WindowEvent::MouseInput {
+                    button: event::MouseButton::Left,
+                    state,
+                    ..
+                } => match state {
+                    event::ElementState::Pressed => {
+                        mouse_pressed = true;
+                        display
+                            .gl_window()
+                            .window()
+                            .set_cursor_grab(window::CursorGrabMode::Locked)
+                            .or_else(|_| {
                                 display
                                     .gl_window()
                                     .window()
-                                    .set_cursor_grab(window::CursorGrabMode::Locked)
-                                    .or_else(|_| {
-                                        display
-                                            .gl_window()
-                                            .window()
-                                            .set_cursor_grab(window::CursorGrabMode::Confined)
-                                    })
-                                    .unwrap();
+                                    .set_cursor_grab(window::CursorGrabMode::Confined)
+                            })
+                            .unwrap();
 
-                                display.gl_window().window().set_cursor_visible(false);
-                            }
-
-                            event::ElementState::Released => {
-                                mouse_pressed = false;
-                                display
-                                    .gl_window()
-                                    .window()
-                                    .set_cursor_grab(window::CursorGrabMode::None)
-                                    .unwrap();
-                                display.gl_window().window().set_cursor_visible(true);
-                            }
-                        }
+                        display.gl_window().window().set_cursor_visible(false);
                     }
-                }
+
+                    event::ElementState::Released => {
+                        mouse_pressed = false;
+                        display
+                            .gl_window()
+                            .window()
+                            .set_cursor_grab(window::CursorGrabMode::None)
+                            .unwrap();
+                        display.gl_window().window().set_cursor_visible(true);
+                    }
+                },
                 _ => {}
             },
             event::Event::RedrawRequested(_) => {
@@ -243,20 +244,18 @@ impl<V: GLSimulationVertex + 'static> SimulationRenderData<V> {
             event::Event::DeviceEvent {
                 event: event::DeviceEvent::MouseMotion { delta, .. },
                 ..
-            } => {
-                if mouse_pressed {
-                    let inner_window_size = display.gl_window().window().inner_size();
+            } if mouse_pressed => {
+                let inner_window_size = display.gl_window().window().inner_size();
 
-                    display
-                        .gl_window()
-                        .window()
-                        .set_cursor_position(dpi::PhysicalPosition {
-                            x: inner_window_size.width / 2,
-                            y: inner_window_size.height / 2,
-                        })
-                        .unwrap();
-                    camera_controller.set_mouse_delta(delta.0, delta.1)
-                }
+                display
+                    .gl_window()
+                    .window()
+                    .set_cursor_position(dpi::PhysicalPosition {
+                        x: inner_window_size.width / 2,
+                        y: inner_window_size.height / 2,
+                    })
+                    .unwrap();
+                camera_controller.set_mouse_delta(delta.0, delta.1)
             }
             _ => (),
         });
@@ -268,8 +267,8 @@ impl<V: GLSimulationVertex + 'static> SimulationRenderData<V> {
         use gl::Surface;
         target.clear_color_and_depth(self.global_params.bg_color.into(), 1.0);
 
-        let perspective: [[_; 4]; 4] = projection.into_inner().into();
-        let view: [[_; 4]; 4] = camera.calc_matrix().into();
+        let perspective: [_; _] = projection.into_inner().into();
+        let view: [_; _] = camera.calc_matrix().into();
 
         let aspect = projection.aspect();
 
@@ -278,7 +277,12 @@ impl<V: GLSimulationVertex + 'static> SimulationRenderData<V> {
             ..Default::default()
         };
 
-        for RayPath { color, non_loop_path, loop_path } in &self.ray_paths {
+        for RayPath {
+            color,
+            non_loop_path,
+            loop_path,
+        } in &self.ray_paths
+        {
             target
                 .draw(
                     non_loop_path,

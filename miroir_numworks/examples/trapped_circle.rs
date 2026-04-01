@@ -1,8 +1,6 @@
 #![no_std]
 #![no_main]
 
-use core::panic::PanicInfo;
-
 use miroir_numworks::{
     display_simulation,
     eadk::{
@@ -95,6 +93,6 @@ fn main() {
 }
 
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
+fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
     loop {}
 }

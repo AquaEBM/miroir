@@ -73,13 +73,14 @@ impl<S: RealField> Cylinder<S> {
     #[must_use]
     pub fn tangents_at_intersections(
         &self,
-        ray: &Ray<SVector<S, 3>>,
+        pos: &SVector<S, 3>,
+        dir: &SVector<S, 3>,
     ) -> ArrayVec<(S, Unit<SVector<S, 3>>), 2> {
         let line_coord = |v| self.dist.dot(&v) * self.inv_norm_dist_squared.clone();
         let p = |v| &self.dist * line_coord(v);
 
-        let m = &ray.pos - &self.start;
-        let d = &ray.dir;
+        let m = pos - &self.start;
+        let d = dir;
         let pm = p(m.clone());
         let pd = p(d.clone());
 
@@ -97,7 +98,7 @@ impl<S: RealField> Cylinder<S> {
             let t1 = (neg_b.clone() - root.clone()) / a.clone();
             let t2 = (neg_b + root) / a;
             for t in [t1, t2] {
-                let origin = ray.at(t.clone());
+                let origin = pos + dir * t.clone();
                 let v = &origin - &self.start;
                 let coord = line_coord(v);
 
@@ -116,13 +117,14 @@ impl<S: RealField> Cylinder<S> {
     }
 }
 
-impl<S: RealField> Mirror<Unit<SVector<S, 3>>> for Cylinder<S> {
+impl<S: RealField> Mirror<SVector<S, 3>, Unit<SVector<S, 3>>> for Cylinder<S> {
+    type Reflector = Unit<SVector<S, 3>>;
     fn closest_intersection(
         &self,
-        ray: &Ray<SVector<S, 3>>,
-        ctx: SimulationCtx<S>,
-    ) -> Option<Intersection<Unit<SVector<S, 3>>>> {
-        ctx.closest(self.tangents_at_intersections(ray))
+        ray: &Ray<SVector<S, 3>, Unit<SVector<S, 3>>>,
+        ctx: SimulationCtx<'_, S>,
+    ) -> Option<Intersection<S, Self::Reflector>> {
+        ctx.closest(self.tangents_at_intersections(&ray.pos, &ray.dir))
     }
 }
 
@@ -147,13 +149,13 @@ impl RenderData for CylinderRenderData {
 #[cfg(feature = "glium")]
 impl<S: RealField + AsPrimitive<f32>> OpenGLRenderable for Cylinder<S> {
     fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-
         let d = self.segment_dist().map(|v| v.as_());
 
         let rot = na::Rotation::<_, 3>::rotation_between(
             &na::SVector::from([0., 0., 1.]),
             &d.normalize(),
-        ).unwrap();
+        )
+        .unwrap();
 
         let r = self.radius().as_();
         let start = self.start().map(AsPrimitive::as_);
@@ -163,15 +165,19 @@ impl<S: RealField + AsPrimitive<f32>> OpenGLRenderable for Cylinder<S> {
 
         let mut vertices: [_; NUM_VERTICES] = [Default::default(); NUM_VERTICES];
 
-        vertices.as_chunks_mut().0.iter_mut().enumerate().for_each(|(i, [a, b])| {
+        vertices
+            .as_chunks_mut()
+            .0
+            .iter_mut()
+            .enumerate()
+            .for_each(|(i, [a, b])| {
+                use core::f32::consts::TAU;
 
-            use core::f32::consts::TAU;
-
-            let (x, y) = (i as f32 / NUM_POINTS as f32 * TAU).sin_cos();
-            let vertex = [x * r, y * r, 0.];
-            let k = rot * na::SVector::from(vertex) + start;
-            (*a, *b) = (k.into(), (k + d).into())
-        });
+                let (x, y) = (i as f32 / NUM_POINTS as f32 * TAU).sin_cos();
+                let vertex = [x * r, y * r, 0.];
+                let k = rot * na::SVector::from(vertex) + start;
+                (*a, *b) = (k.into(), (k + d).into())
+            });
 
         let vertices = gl::VertexBuffer::immutable(display, vertices.as_slice()).unwrap();
 

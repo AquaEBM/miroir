@@ -1,7 +1,7 @@
 #![no_std]
 
 use eadk::kandinsky;
-use miroir::{either::Either, Reflector, Mirror, Ray, Scalar, VMulAdd};
+use miroir::{Direction, Mirror, Point, Ray, Reflect, either::Either};
 use num_traits::AsPrimitive;
 
 #[cfg(feature = "alloc")]
@@ -141,14 +141,12 @@ impl Default for SimulationParams {
     }
 }
 
-pub fn display_simulation<R: Reflector>(
-    mirror: &(impl Mirror<R> + KandinskyRenderable + ?Sized),
-    rays: impl IntoIterator<Item = (Ray<R::Vector>, RayParams<Scalar<R>>)>,
+pub fn display_simulation<D: Direction<Scalar: Copy + 'static>, P: Point<D> + ToPoint>(
+    mirror: &(impl Mirror<P, D, Reflector: Reflect<D>> + KandinskyRenderable + ?Sized),
+    rays: impl IntoIterator<Item = (Ray<P, D>, RayParams<D::Scalar>)>,
     params: SimulationParams,
 ) where
-    R::Vector: VMulAdd + ToPoint,
-    Scalar<R>: 'static + Copy,
-    f64: AsPrimitive<Scalar<R>>,
+    f64: AsPrimitive<D::Scalar>,
 {
     mirror.draw(params.mirror_color);
 
@@ -164,7 +162,7 @@ pub fn display_simulation<R: Reflector>(
             }
 
             if let Some((dist, dir)) = ray.closest_intersection(mirror, &params.eps) {
-                ray.advance(dist);
+                ray.advance(&dist);
                 let p1 = ray.pos.to_point();
                 kandinsky::draw_line(prev_pt, p1, params.color);
                 prev_pt = p1;
@@ -177,7 +175,7 @@ pub fn display_simulation<R: Reflector>(
         }
 
         if diverges {
-            ray.advance(410.0.as_());
+            ray.advance(&410.0.as_());
             kandinsky::draw_line(prev_pt, ray.pos.to_point(), params.color);
         }
     }

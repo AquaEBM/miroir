@@ -1,34 +1,27 @@
 use super::*;
 
-pub use nalgebra as na;
-use na::{zero, ComplexField, SMatrix, SVector, SimdComplexField, Unit};
 use core::ops::Deref;
+use na::{zero, ComplexField, SMatrix, SVector, SimdComplexField, Unit};
+pub use nalgebra as na;
 
-impl<S: SimdComplexField, const D: usize> Vector for SVector<S, D> {
+impl<S: SimdComplexField, const D: usize> Direction for Unit<SVector<S, D>> {
     type Scalar = S;
 }
 
-impl<S: SimdComplexField, const D: usize> VMulAdd for SVector<S, D> {
-    #[inline]
-    fn mul_add(&self, t: Self::Scalar, other: &Self) -> Self
-    where
-        Self: Sized,
-    {
-        self * t + other
+impl<S: SimdComplexField, const D: usize> Point<Unit<SVector<S, D>>> for SVector<S, D> {
+    fn translate(&mut self, dir: &Unit<SVector<S, D>>, t: &S) {
+        *self += dir.as_ref() * t.clone();
     }
 }
 
-impl<S: SimdComplexField, const D: usize> Reflector for Unit<SVector<S, D>> {
-    type Vector = SVector<S, D>;
-
+impl<S: SimdComplexField, const D: usize> Reflect<Unit<SVector<S, D>>> for Unit<SVector<S, D>> {
     #[inline]
-    fn reflect(&self, v: &mut Self::Vector) {
+    fn reflect(&self, v: &mut Unit<SVector<S, D>>) {
         let n = self.as_ref();
 
-        let p = v.dot(n);
+        let p = v.as_ref().dot(n);
 
-        *v -= n * (p.clone() + p);
-        v.normalize_mut();
+        *v.as_mut_unchecked() -= n * (p.clone() + p);
     }
 }
 
@@ -78,24 +71,24 @@ impl<S: ComplexField, const D: usize> HyperplaneBasis<S, D> {
     #[must_use]
     pub fn intersection_coordinates(
         &self,
-        ray: &Ray<SVector<S, D>>,
+        pos: &SVector<S, D>,
+        dir: &SVector<S, D>,
         v0: &SVector<S, D>,
     ) -> Option<SVector<S, D>>
     where
-        na::Const<D>: na::DimMin<na::Const<D>, Output = na::Const<D>>, 
+        na::Const<D>: na::DimMin<na::Const<D>, Output = na::Const<D>>,
     {
         let mut a = SMatrix::<S, D, D>::from_columns(&self.vectors);
-        a.set_column(0, &ray.dir);
+        a.set_column(0, dir);
         let a = a.full_piv_lu();
 
-        a.is_invertible()
-            .then(|| {
-                let mut v = &ray.pos - v0;
-                a.solve_mut(&mut v);
-                let first = &mut v[0];
-                *first = -first.clone();
-                v
-            })
+        a.is_invertible().then(|| {
+            let mut v = pos - v0;
+            a.solve_mut(&mut v);
+            let first = &mut v[0];
+            *first = -first.clone();
+            v
+        })
     }
 }
 
@@ -194,41 +187,29 @@ impl<S: SimdComplexField, const D: usize> HyperplaneBasisOrtho<S, D> {
     }
 }
 
-impl<S: SimdComplexField, const D: usize> Reflector for HyperplaneBasisOrtho<S, D> {
-    type Vector = SVector<S, D>;
-
+impl<S: SimdComplexField, const D: usize> Reflect<Unit<SVector<S, D>>>
+    for HyperplaneBasisOrtho<S, D>
+{
     #[inline]
-    /// Reflect a vector w.r.t this hyperplane
-    fn reflect(&self, v: &mut SVector<S, D>) {
-        let p2: Self::Vector = self
+    /// Reflect a unit vector w.r.t this hyperplane
+    fn reflect(&self, v: &mut Unit<SVector<S, D>>) {
+        let p2: SVector<S, D> = self
             .basis()
             .iter()
             .map(|e| {
-                let c = v.dot(e);
+                let c = v.as_ref().dot(e);
                 e * (c.clone() + c)
             })
             .sum();
-        *v = p2 - &*v;
-        v.normalize_mut();
+        *v.as_mut_unchecked() = p2 - v.as_ref();
     }
 }
 
-impl<S, const D: usize> Ray<SVector<S, D>> {
+impl<P, S: ComplexField, const D: usize> Ray<P, Unit<SVector<S, D>>> {
     #[inline]
     #[must_use]
-    pub fn new_unit_dir(pos: impl Into<SVector<S, D>>, dir: Unit<SVector<S, D>>) -> Self {
-        Self::new(pos, dir.into_inner())
-    }
-}
-
-impl<S: ComplexField, const D: usize> Ray<SVector<S, D>> {
-    #[inline]
-    #[must_use]
-    pub fn try_new_normalize(
-        pos: impl Into<SVector<S, D>>,
-        dir: impl Into<SVector<S, D>>,
-    ) -> Option<Self> {
-        Unit::try_new(dir.into(), zero()).map(|unit| Self::new_unit_dir(pos, unit))
+    pub fn try_new_normalize(pos: impl Into<P>, dir: impl Into<SVector<S, D>>) -> Option<Self> {
+        Unit::try_new(dir.into(), zero()).map(|unit| Self::new(pos, unit))
     }
 
     /// # Panics
@@ -236,7 +217,7 @@ impl<S: ComplexField, const D: usize> Ray<SVector<S, D>> {
     /// if `dir` is zero
     #[inline]
     #[must_use]
-    pub fn new_normalize(pos: impl Into<SVector<S, D>>, dir: impl Into<SVector<S, D>>) -> Self {
+    pub fn new_normalize(pos: impl Into<P>, dir: impl Into<SVector<S, D>>) -> Self {
         Self::try_new_normalize(pos, dir).expect("direction must not be zero")
     }
 }
@@ -253,13 +234,16 @@ pub fn loop_index<const D: usize, S: ComplexField>(
     path.split_last().and_then(|(last_pt, points)| {
         let current_dir = Unit::new_normalize(new_pt - last_pt).into_inner();
 
-        points.windows(2).enumerate().find_map(|(i, window)| {
-            let [this_pt, next_pt] = window else { panic!() };
+        points
+            .as_chunks()
+            .0
+            .iter()
+            .enumerate()
+            .find_map(|(i, [this_pt, next_pt])| {
+                let impact_dir = Unit::new_normalize(next_pt - this_pt).into_inner();
 
-            let impact_dir = Unit::new_normalize(next_pt - this_pt).into_inner();
-
-            ((new_pt - next_pt).norm() <= *eps && (impact_dir - &current_dir).norm() <= *eps)
-                .then_some(i)
-        })
+                ((new_pt - next_pt).norm() <= *eps && (impact_dir - &current_dir).norm() <= *eps)
+                    .then_some(i)
+            })
     })
 }

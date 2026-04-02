@@ -1,6 +1,5 @@
 use core::{
-    array,
-    ops::{Add, Mul},
+    array, ops::{Add, Mul}
 };
 use num_traits::AsPrimitive;
 use std::{time, collections::TryReserveError, rc::Rc, sync::Arc};
@@ -190,14 +189,14 @@ impl SimulationWindow {
     }
 
     #[inline]
-    pub fn display<R: Reflector<Vector: Vector + VMulAdd + ToGLVertex + 'static>>(
+    pub fn display<D: Direction, P: Point<D> + ToGLVertex<Vertex: 'static>>(
         self,
-        mirror: &(impl Mirror<R> + OpenGLRenderable + ?Sized),
-        rays: impl IntoIterator<Item = (Ray<R::Vector>, RayParams<Scalar<R>>)>,
+        mirror: &(impl Mirror<P, D, Reflector: Reflect<D>> + OpenGLRenderable + ?Sized),
+        rays: impl IntoIterator<Item = (Ray<P, D>, RayParams<D::Scalar>)>,
         params: SimulationParams,
     ) where
-        Scalar<R>: Copy + 'static,
-        f64: AsPrimitive<Scalar<R>>,
+        D::Scalar: Copy + 'static,
+        f64: AsPrimitive<D::Scalar>,
     {
         let Self {
             events_loop,

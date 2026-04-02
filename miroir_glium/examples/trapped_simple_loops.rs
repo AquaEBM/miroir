@@ -14,7 +14,7 @@ fn main() {
     );
 
     let params = RayParams {
-        reflection_cap: Some(100),
+        reflection_cap: Some(4),
         ..Default::default()
     };
 

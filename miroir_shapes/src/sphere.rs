@@ -36,13 +36,13 @@ impl<S: ComplexField, const D: usize> Sphere<S, D> {
 
     #[inline]
     #[must_use]
-    pub fn intersections(&self, ray: &Ray<SVector<S, D>>) -> Option<[S; 2]> {
+    pub fn intersections(&self, pos: &SVector<S, D>, dir: &SVector<S, D>) -> Option<[S; 2]> {
         // substituting `V` for `P + t * D` in the sphere equation:
         // `||V - C||^2 = r^2` results in a quadratic equation in `t`.
 
-        let v = &ray.pos - &self.center;
+        let v = pos - &self.center;
 
-        let b = v.dotc(&ray.dir).real();
+        let b = v.dotc(&dir).real();
         let c = v.norm_squared() - self.radius_sq.clone();
 
         let delta = b.clone().mul_add(b.clone(), -c);
@@ -58,16 +58,17 @@ impl<S: ComplexField, const D: usize> Sphere<S, D> {
     #[must_use]
     pub fn tangents_at_intersections(
         &self,
-        ray: &Ray<SVector<S, D>>,
+        pos: &SVector<S, D>,
+        dir: &SVector<S, D>,
     ) -> Option<[(S, Unit<SVector<S, D>>); 2]> {
-        self.intersections(ray).map(|ds| {
+        self.intersections(pos, dir).map(|ds| {
             ds.map(|d| {
                 (
                     d.clone(),
                     // SAFETY: p := ray.at(d) is in the sphere,
                     // so ||p - self.center|| = |self.radius|
                     Unit::new_unchecked(
-                        (ray.at(d) - self.center.clone()).unscale(self.radius.clone().abs()),
+                        ((pos - &self.center) + dir * d).unscale(self.radius.clone().abs()),
                     ),
                 )
             })
@@ -75,13 +76,14 @@ impl<S: ComplexField, const D: usize> Sphere<S, D> {
     }
 }
 
-impl<S: RealField, const D: usize> Mirror<Unit<SVector<S, D>>> for Sphere<S, D> {
+impl<S: RealField, const D: usize> Mirror<SVector<S, D>, Unit<SVector<S, D>>> for Sphere<S, D> {
+    type Reflector = Unit<SVector<S, D>>;
     fn closest_intersection(
         &self,
-        ray: &Ray<SVector<S, D>>,
-        ctx: SimulationCtx<S>,
-    ) -> Option<Intersection<Unit<SVector<S, D>>>> {
-        ctx.closest(self.tangents_at_intersections(ray).into_iter().flatten())
+        ray: &Ray<SVector<S, D>, Unit<SVector<S, D>>>,
+        ctx: SimulationCtx<'_, S>,
+    ) -> Option<Intersection<S, Self::Reflector>> {
+        ctx.closest(self.tangents_at_intersections(&ray.pos, ray.dir.as_ref()).into_iter().flatten())
     }
 }
 

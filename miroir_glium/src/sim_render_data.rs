@@ -72,15 +72,15 @@ void main() {
 }";
 
 impl<V: GLSimulationVertex + 'static> SimulationRenderData<V> {
-    pub(crate) fn from_simulation<R: Reflector<Vector: VMulAdd + Vector + ToGLVertex<Vertex = V>>>(
-        mirror: &(impl Mirror<R> + OpenGLRenderable + ?Sized),
-        rays: impl IntoIterator<Item = (Ray<R::Vector>, RayParams<Scalar<R>>)>,
+    pub(crate) fn from_simulation<D: Direction, P: Point<D> + ToGLVertex<Vertex = V>>(
+        mirror: &(impl Mirror<P, D, Reflector: Reflect<D>> + OpenGLRenderable + ?Sized),
+        rays: impl IntoIterator<Item = (Ray<P, D>, RayParams<D::Scalar>)>,
         display: &gl::Display,
         global_params: SimulationParams,
     ) -> Self
     where
-        Scalar<R>: Copy + 'static,
-        f64: AsPrimitive<Scalar<R>>,
+        D::Scalar: Copy + 'static,
+        f64: AsPrimitive<D::Scalar>,
     {
         let program =
             gl::Program::from_source(display, V::SHADER_SRC, FRAGMENT_SHADER_SRC, None).unwrap();
@@ -117,14 +117,14 @@ impl<V: GLSimulationVertex + 'static> SimulationRenderData<V> {
                     outcome = Ok(false);
                     break;
                 }
-                ray.advance(dist);
+                ray.advance(&dist);
                 vertex_scratch.push(ray.pos.to_gl_vertex());
                 ray.reflect_dir(&dir);
                 count += 1;
             }
 
             if let Ok(true) = outcome {
-                ray.advance(10000.0.as_());
+                ray.advance(&10000.0.as_());
                 vertex_scratch.push(ray.pos.to_gl_vertex());
             }
 

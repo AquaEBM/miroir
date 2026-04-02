@@ -2,38 +2,30 @@
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
-#[cfg(feature = "alloc")]
-use alloc::{boxed::Box, rc::Rc, sync::Arc, vec::Vec};
 pub use either;
 use either::Either;
 
-use core::convert::identity as id;
+use core::{convert::identity as id, iter};
 
 #[cfg(feature = "nalgebra")]
 mod nalg;
 #[cfg(feature = "nalgebra")]
 pub use nalg::*;
 
-pub trait Vector {
+pub trait Direction {
     type Scalar;
 }
 
-pub trait VMulAdd: Vector {
-    fn mul_add(&self, t: Self::Scalar, other: &Self) -> Self
-    where
-        Self: Sized;
+pub trait Point<D: Direction + ?Sized> {
+    fn translate(&mut self, dir: &D, t: &D::Scalar);
 }
 
-pub trait Reflector {
-    type Vector: Vector;
-
-    fn reflect(&self, v: &mut Self::Vector);
+pub trait Reflect<Dir: ?Sized> {
+    fn reflect(&self, v: &mut Dir);
 }
 
-impl<R1: Reflector, R2: Reflector<Vector = R1::Vector>> Reflector for Either<R1, R2> {
-    type Vector = R1::Vector;
-
-    fn reflect(&self, v: &mut Self::Vector) {
+impl<D, R1: Reflect<D>, R2: Reflect<D>> Reflect<D> for Either<R1, R2> {
+    fn reflect(&self, v: &mut D) {
         match self {
             Either::Left(m) => m.reflect(v),
             Either::Right(m) => m.reflect(v),
@@ -41,18 +33,16 @@ impl<R1: Reflector, R2: Reflector<Vector = R1::Vector>> Reflector for Either<R1,
     }
 }
 
-pub type Scalar<T> = <<T as Reflector>::Vector as Vector>::Scalar;
-
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Ray<V> {
-    pub pos: V,
-    pub dir: V,
+pub struct Ray<P, D> {
+    pub pos: P,
+    pub dir: D,
 }
 
-impl<V> Ray<V> {
+impl<P, D> Ray<P, D> {
     #[inline]
     #[must_use]
-    pub fn new(pos: impl Into<V>, dir: impl Into<V>) -> Self {
+    pub fn new(pos: impl Into<P>, dir: impl Into<D>) -> Self {
         Self {
             pos: pos.into(),
             dir: dir.into(),
@@ -60,12 +50,14 @@ impl<V> Ray<V> {
     }
 }
 
-impl<V: Vector> Ray<V> {
+impl<P, D> Ray<P, D> {
     #[inline]
-    pub fn reflect_dir(&mut self, dir: &(impl Reflector<Vector = V> + ?Sized)) {
+    pub fn reflect_dir(&mut self, dir: &(impl Reflect<D> + ?Sized)) {
         dir.reflect(&mut self.dir);
     }
+}
 
+impl<P, D: Direction> Ray<P, D> {
     /// Returns the smallest (positive) `t` such that `P :=`[`self.at(t)`](Self::at)
     /// (approximately) intersects with `mirror`, and the direction space
     /// of the tangent to `mirror` at `P`, if any.
@@ -83,46 +75,43 @@ impl<V: Vector> Ray<V> {
     /// to make sure `ray` doesn't ignore an intersection it shouldn't.
     #[inline]
     #[must_use]
-    pub fn closest_intersection<R: Reflector<Vector = V>>(
+    pub fn closest_intersection<M: Mirror<P, D> + ?Sized>(
         &self,
-        mirror: &(impl Mirror<R> + ?Sized),
-        eps: &V::Scalar,
-    ) -> Option<(Scalar<R>, R)> {
+        mirror: &M,
+        eps: &D::Scalar,
+    ) -> Option<(D::Scalar, M::Reflector)> {
         let ctx = SimulationCtx::new(eps);
         mirror.closest_intersection(self, ctx).map(Into::into)
     }
-}
-
-impl<V: VMulAdd> Ray<V> {
-    #[inline]
-    pub fn advance(&mut self, t: V::Scalar) {
-        self.pos = self.at(t);
-    }
 
     #[inline]
-    pub fn at(&self, t: V::Scalar) -> V {
-        self.dir.mul_add(t, &self.pos)
+    pub fn advance(&mut self, t: &D::Scalar)
+    where
+        P: Point<D>,
+    {
+        self.pos.translate(&self.dir, t);
     }
 }
 
-pub struct Intersection<R: Reflector> {
-    dist: Scalar<R>,
-    dir: R,
+#[derive(Debug)]
+pub struct Intersection<S, D> {
+    dist: S,
+    dir: D,
 }
 
-impl<R: Reflector> From<Intersection<R>> for (Scalar<R>, R) {
-    fn from(Intersection { dist, dir }: Intersection<R>) -> Self {
+impl<S, D> From<Intersection<S, D>> for (S, D) {
+    fn from(Intersection { dist, dir }: Intersection<S, D>) -> Self {
         (dist, dir)
     }
 }
 
-impl<R: Reflector> Intersection<R> {
+impl<S, D> Intersection<S, D> {
     #[inline]
-    pub fn map<R2: Reflector>(
+    pub fn map<S2, D2>(
         self,
-        fdist: impl FnOnce(Scalar<R>) -> Scalar<R2>,
-        fdir: impl FnOnce(R) -> R2,
-    ) -> Intersection<R2> {
+        fdist: impl FnOnce(S) -> S2,
+        fdir: impl FnOnce(D) -> D2,
+    ) -> Intersection<S2, D2> {
         let Intersection { dist, dir } = self;
         Intersection {
             dist: fdist(dist),
@@ -151,12 +140,12 @@ impl<'a, S> SimulationCtx<'a, S> {
 
     #[inline]
     #[must_use]
-    pub fn closest<R: Reflector<Vector: Vector<Scalar = S>>>(
+    pub fn closest<R>(
         &self,
-        tangents: impl IntoIterator<Item = (Scalar<R>, R)>,
-    ) -> Option<Intersection<R>>
+        tangents: impl IntoIterator<Item = (S, R)>,
+    ) -> Option<Intersection<S, R>>
     where
-        Scalar<R>: PartialOrd,
+        S: PartialOrd,
     {
         tangents
             .into_iter()
@@ -166,23 +155,22 @@ impl<'a, S> SimulationCtx<'a, S> {
     }
 }
 
-pub trait Mirror<R: Reflector> {
+pub trait Mirror<P, D: Direction> {
+    type Reflector;
     fn closest_intersection(
         &self,
-        ray: &Ray<R::Vector>,
-        ctx: SimulationCtx<Scalar<R>>,
-    ) -> Option<Intersection<R>>;
+        ray: &Ray<P, D>,
+        ctx: SimulationCtx<'_, D::Scalar>,
+    ) -> Option<Intersection<D::Scalar, Self::Reflector>>;
 }
 
-impl<R1: Reflector, R2: Reflector<Vector = R1::Vector>, M: Mirror<R1>, N: Mirror<R2>>
-    Mirror<Either<R1, R2>> for Either<M, N>
-{
+impl<P, D: Direction, M1: Mirror<P, D>, M2: Mirror<P, D>> Mirror<P, D> for Either<M1, M2> {
+    type Reflector = Either<M1::Reflector, M2::Reflector>;
     fn closest_intersection(
         &self,
-        ray: &Ray<R1::Vector>,
-        ctx: SimulationCtx<Scalar<R1>>,
-    ) -> Option<Intersection<Either<R1, R2>>> {
-
+        ray: &Ray<P, D>,
+        ctx: SimulationCtx<'_, D::Scalar>,
+    ) -> Option<Intersection<D::Scalar, Self::Reflector>> {
         match self.as_ref() {
             Either::Left(m) => m
                 .closest_intersection(ray, ctx)
@@ -194,39 +182,39 @@ impl<R1: Reflector, R2: Reflector<Vector = R1::Vector>, M: Mirror<R1>, N: Mirror
     }
 }
 
-impl<R1: Reflector, R2: Reflector<Vector = R1::Vector>, M: Mirror<R1>, N: Mirror<R2>>
-    Mirror<Either<R1, R2>> for (M, N)
+impl<P, D: Direction, M1: Mirror<P, D>, M2: Mirror<P, D>> Mirror<P, D> for (M1, M2)
 where
-    Scalar<R1>: PartialOrd,
+    D::Scalar: PartialOrd,
 {
+    type Reflector = Either<M1::Reflector, M2::Reflector>;
     fn closest_intersection(
         &self,
-        ray: &Ray<R1::Vector>,
-        ctx: SimulationCtx<Scalar<R1>>,
-    ) -> Option<Intersection<Either<R1, R2>>> {
+        ray: &Ray<P, D>,
+        ctx: SimulationCtx<'_, D::Scalar>,
+    ) -> Option<Intersection<D::Scalar, Self::Reflector>> {
         let (l, r) = self;
 
-        l.closest_intersection(ray, ctx.clone())
-            .map(|i| i.map(id, Either::Left))
-            .into_iter()
-            .chain(
-                r.closest_intersection(ray, ctx)
-                    .map(|i| i.map(id, Either::Right)),
-            )
-            .min_by(|i1, i2| i1.dist.partial_cmp(&i2.dist).unwrap())
+        iter::chain(
+            l.closest_intersection(ray, ctx.clone())
+                .map(|i| i.map(id, Either::Left)),
+            r.closest_intersection(ray, ctx.clone())
+                .map(|i| i.map(id, Either::Right)),
+        )
+        .min_by(|i1, i2| i1.dist.partial_cmp(&i2.dist).unwrap())
     }
 }
 
-impl<R: Reflector, T: Mirror<R>> Mirror<R> for [T]
+impl<P, D: Direction, T: Mirror<P, D>> Mirror<P, D> for [T]
 where
-    Scalar<R>: PartialOrd,
+    D::Scalar: PartialOrd,
 {
+    type Reflector = T::Reflector;
     #[inline]
     fn closest_intersection(
         &self,
-        ray: &Ray<R::Vector>,
-        ctx: SimulationCtx<Scalar<R>>,
-    ) -> Option<Intersection<R>> {
+        ray: &Ray<P, D>,
+        ctx: SimulationCtx<'_, D::Scalar>,
+    ) -> Option<Intersection<D::Scalar, Self::Reflector>> {
         ctx.closest(
             self.iter()
                 .filter_map(|m| m.closest_intersection(ray, ctx.clone()))
@@ -235,89 +223,96 @@ where
     }
 }
 
-impl<R: Reflector, T: Mirror<R>, const N: usize> Mirror<R> for [T; N]
+impl<P, D: Direction, T: Mirror<P, D>, const N: usize> Mirror<P, D> for [T; N]
 where
-    Scalar<R>: PartialOrd,
+    D::Scalar: PartialOrd,
 {
+    type Reflector = T::Reflector;
     #[inline]
     fn closest_intersection(
         &self,
-        ray: &Ray<R::Vector>,
-        ctx: SimulationCtx<Scalar<R>>,
-    ) -> Option<Intersection<R>> {
+        ray: &Ray<P, D>,
+        ctx: SimulationCtx<'_, D::Scalar>,
+    ) -> Option<Intersection<D::Scalar, Self::Reflector>> {
         self.as_slice().closest_intersection(ray, ctx)
     }
 }
 
 #[cfg(feature = "alloc")]
-impl<R: Reflector, T: Mirror<R>> Mirror<R> for Vec<T>
+impl<P, D: Direction, T: Mirror<P, D>> Mirror<P, D> for alloc::vec::Vec<T>
 where
-    Scalar<R>: PartialOrd,
+    D::Scalar: PartialOrd,
 {
+    type Reflector = T::Reflector;
     #[inline]
     fn closest_intersection(
         &self,
-        ray: &Ray<R::Vector>,
-        ctx: SimulationCtx<Scalar<R>>,
-    ) -> Option<Intersection<R>> {
+        ray: &Ray<P, D>,
+        ctx: SimulationCtx<'_, D::Scalar>,
+    ) -> Option<Intersection<D::Scalar, Self::Reflector>> {
         self.as_slice().closest_intersection(ray, ctx)
     }
 }
 
 #[cfg(feature = "alloc")]
-impl<R: Reflector, T: Mirror<R> + ?Sized> Mirror<R> for Box<T> {
+impl<P, D: Direction, T: Mirror<P, D>> Mirror<P, D> for alloc::boxed::Box<T> {
+    type Reflector = T::Reflector;
     #[inline]
     fn closest_intersection(
         &self,
-        ray: &Ray<R::Vector>,
-        ctx: SimulationCtx<Scalar<R>>,
-    ) -> Option<Intersection<R>> {
+        ray: &Ray<P, D>,
+        ctx: SimulationCtx<'_, D::Scalar>,
+    ) -> Option<Intersection<D::Scalar, Self::Reflector>> {
         self.as_ref().closest_intersection(ray, ctx)
     }
 }
 
 #[cfg(feature = "alloc")]
-impl<R: Reflector, T: Mirror<R> + ?Sized> Mirror<R> for Arc<T> {
+impl<P, D: Direction, T: Mirror<P, D>> Mirror<P, D> for alloc::sync::Arc<T> {
+    type Reflector = T::Reflector;
     #[inline]
     fn closest_intersection(
         &self,
-        ray: &Ray<R::Vector>,
-        ctx: SimulationCtx<Scalar<R>>,
-    ) -> Option<Intersection<R>> {
+        ray: &Ray<P, D>,
+        ctx: SimulationCtx<'_, D::Scalar>,
+    ) -> Option<Intersection<D::Scalar, Self::Reflector>> {
         self.as_ref().closest_intersection(ray, ctx)
     }
 }
 
 #[cfg(feature = "alloc")]
-impl<R: Reflector, T: Mirror<R> + ?Sized> Mirror<R> for Rc<T> {
+impl<P, D: Direction, T: Mirror<P, D>> Mirror<P, D> for alloc::rc::Rc<T> {
+    type Reflector = T::Reflector;
     #[inline]
     fn closest_intersection(
         &self,
-        ray: &Ray<R::Vector>,
-        ctx: SimulationCtx<Scalar<R>>,
-    ) -> Option<Intersection<R>> {
+        ray: &Ray<P, D>,
+        ctx: SimulationCtx<'_, D::Scalar>,
+    ) -> Option<Intersection<D::Scalar, Self::Reflector>> {
         self.as_ref().closest_intersection(ray, ctx)
     }
 }
 
-impl<R: Reflector, T: Mirror<R> + ?Sized> Mirror<R> for &T {
+impl<P, D: Direction, T: Mirror<P, D>> Mirror<P, D> for &T {
+    type Reflector = T::Reflector;
     #[inline]
     fn closest_intersection(
         &self,
-        ray: &Ray<R::Vector>,
-        ctx: SimulationCtx<Scalar<R>>,
-    ) -> Option<Intersection<R>> {
+        ray: &Ray<P, D>,
+        ctx: SimulationCtx<'_, D::Scalar>,
+    ) -> Option<Intersection<D::Scalar, Self::Reflector>> {
         (*self).closest_intersection(ray, ctx)
     }
 }
 
-impl<R: Reflector, T: Mirror<R> + ?Sized> Mirror<R> for &mut T {
+impl<P, D: Direction, T: Mirror<P, D>> Mirror<P, D> for &mut T {
+    type Reflector = T::Reflector;
     #[inline]
     fn closest_intersection(
         &self,
-        ray: &Ray<R::Vector>,
-        ctx: SimulationCtx<Scalar<R>>,
-    ) -> Option<Intersection<R>> {
+        ray: &Ray<P, D>,
+        ctx: SimulationCtx<'_, D::Scalar>,
+    ) -> Option<Intersection<D::Scalar, Self::Reflector>> {
         (*self as &T).closest_intersection(ray, ctx)
     }
 }

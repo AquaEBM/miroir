@@ -89,9 +89,9 @@ where
     SVector<S, D>: AddAssign + Clone,
 {
     /// Returns the vertices of this simplex
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// if `D == 0`
     #[inline]
     pub fn vertices(&self) -> [SVector<S, D>; D] {
@@ -106,13 +106,13 @@ where
 impl<S: RealField, const D: usize> Simplex<S, D> {
     /// Returns the distance `d` such that [`ray.at(d)`](Ray::at) intersects with `self`
     #[inline]
-    pub fn intersection(&self, ray: &Ray<SVector<S, D>>) -> Option<S>
+    pub fn intersection(&self, pos: &SVector<S, D>, dir: &SVector<S, D>) -> Option<S>
     where
         na::Const<D>: na::DimMin<na::Const<D>, Output = na::Const<D>>,
     {
         let p = self.inner_plane();
 
-        let intersection_coords = p.intersection_coordinates(ray, p.v0());
+        let intersection_coords = p.intersection_coordinates(pos, dir, p.v0());
 
         intersection_coords.as_ref().and_then(|v| {
             let (distance, plane_coords) = v.as_slice().split_first().unwrap();
@@ -133,17 +133,18 @@ impl<S: RealField, const D: usize> Simplex<S, D> {
     }
 }
 
-impl<S: RealField, const D: usize> Mirror<HyperplaneBasisOrtho<S, D>> for Simplex<S, D>
+impl<S: RealField, const D: usize> Mirror<SVector<S, D>, Unit<SVector<S, D>>> for Simplex<S, D>
 where
     na::Const<D>: na::DimMin<na::Const<D>, Output = na::Const<D>>,
 {
+    type Reflector = HyperplaneBasisOrtho<S, D>;
     fn closest_intersection(
         &self,
-        ray: &Ray<SVector<S, D>>,
-        ctx: SimulationCtx<S>,
-    ) -> Option<Intersection<HyperplaneBasisOrtho<S, D>>> {
+        ray: &Ray<SVector<S, D>, Unit<SVector<S, D>>>,
+        ctx: SimulationCtx<'_, S>,
+    ) -> Option<Intersection<S, Self::Reflector>> {
         ctx.closest(
-            self.intersection(ray)
+            self.intersection(&ray.pos, &ray.dir)
                 .map(|dist| (dist, self.inner_plane_ortho().clone())),
         )
     }

@@ -2,13 +2,12 @@
 #![no_main]
 
 use miroir_numworks::{
-    display_simulation,
+    RayParams, SimulationParams, display_simulation,
     eadk::{
         ion::{Key, KeyboardState},
-        kandinsky::{draw_string_unchecked, fill_rect, Color, Point, Rect},
+        kandinsky::{Color, Point, Rect, draw_string_unchecked, fill_rect},
     },
-    miroir::Ray,
-    RayParams, SimulationParams,
+    miroir::na::Unit,
 };
 use miroir_shapes::{LineSegment, Sphere};
 
@@ -77,7 +76,8 @@ fn main() {
     );
 
     let rays = [(
-        Ray::new_normalize([10., 50.], [2., 1.]),
+        [10., 50.].into(),
+        Unit::new_normalize([2., 1.].into()),
         RayParams {
             reflection_cap: Some(100),
             ..Default::default()

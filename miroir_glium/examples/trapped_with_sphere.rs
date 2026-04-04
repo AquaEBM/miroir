@@ -1,4 +1,4 @@
-use miroir::Ray;
+use miroir::na::Unit;
 use miroir_glium::{RayParams, SimulationParams, SimulationWindow};
 use miroir_shapes::{Sphere, Triangle};
 
@@ -46,7 +46,8 @@ fn main() {
     );
 
     let rays = [(
-        Ray::new_normalize([4., 3., 0.1], [-1., -1., 0.]),
+        [4., 3., 0.1].into(),
+        Unit::new_normalize([-1., -1., 0.].into()),
         RayParams {
             reflection_cap: Some(max),
             ..Default::default()
@@ -59,6 +60,6 @@ fn main() {
         SimulationParams {
             mirror_color: [0., 0., 1., 0.1],
             bg_color: [0.015, 0.01, 0.05, 1.],
-        }
+        },
     );
 }

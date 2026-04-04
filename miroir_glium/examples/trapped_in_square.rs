@@ -1,4 +1,4 @@
-use miroir::Ray;
+use miroir::na::Unit;
 use miroir_glium::{RayParams, SimulationParams, SimulationWindow};
 use miroir_shapes::LineSegment;
 
@@ -11,7 +11,8 @@ fn main() {
     ];
 
     let rays = [(
-        Ray::new_normalize([0.5, 0.33], [1., 1.1]),
+        [0.5, 0.33].into(),
+        Unit::new_normalize([1., 1.1].into()),
         RayParams {
             reflection_cap: Some(100),
             ..Default::default()

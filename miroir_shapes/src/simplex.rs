@@ -137,14 +137,15 @@ impl<S: RealField, const D: usize> Mirror<SVector<S, D>, Unit<SVector<S, D>>> fo
 where
     na::Const<D>: na::DimMin<na::Const<D>, Output = na::Const<D>>,
 {
-    type Reflector = HyperplaneBasisOrtho<S, D>;
+    type Reflector<'a> = HyperplaneBasisOrtho<S, D>;
     fn closest_intersection(
         &self,
-        ray: &Ray<SVector<S, D>, Unit<SVector<S, D>>>,
+        pos: &SVector<S, D>,
+        dir: &Unit<SVector<S, D>>,
         ctx: SimulationCtx<'_, S>,
-    ) -> Option<Intersection<S, Self::Reflector>> {
+    ) -> Option<Intersection<S, Self::Reflector<'_>>> {
         ctx.closest(
-            self.intersection(&ray.pos, &ray.dir)
+            self.intersection(pos, dir)
                 .map(|dist| (dist, self.inner_plane_ortho().clone())),
         )
     }

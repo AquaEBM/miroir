@@ -77,13 +77,18 @@ impl<S: ComplexField, const D: usize> Sphere<S, D> {
 }
 
 impl<S: RealField, const D: usize> Mirror<SVector<S, D>, Unit<SVector<S, D>>> for Sphere<S, D> {
-    type Reflector = Unit<SVector<S, D>>;
+    type Reflector<'a> = Unit<SVector<S, D>>;
     fn closest_intersection(
         &self,
-        ray: &Ray<SVector<S, D>, Unit<SVector<S, D>>>,
+        pos: &SVector<S, D>,
+        dir: &Unit<SVector<S, D>>,
         ctx: SimulationCtx<'_, S>,
-    ) -> Option<Intersection<S, Self::Reflector>> {
-        ctx.closest(self.tangents_at_intersections(&ray.pos, ray.dir.as_ref()).into_iter().flatten())
+    ) -> Option<Intersection<S, Self::Reflector<'_>>> {
+        ctx.closest(
+            self.tangents_at_intersections(pos, dir)
+                .into_iter()
+                .flatten(),
+        )
     }
 }
 

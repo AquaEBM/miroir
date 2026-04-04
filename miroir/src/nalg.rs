@@ -1,7 +1,7 @@
 use super::*;
 
 use core::ops::Deref;
-use na::{zero, ComplexField, SMatrix, SVector, SimdComplexField, Unit};
+use na::{ComplexField, SMatrix, SVector, SimdComplexField, Unit};
 pub use nalgebra as na;
 
 impl<S: SimdComplexField, const D: usize> Direction for Unit<SVector<S, D>> {
@@ -202,23 +202,6 @@ impl<S: SimdComplexField, const D: usize> Reflect<Unit<SVector<S, D>>>
             })
             .sum();
         *v.as_mut_unchecked() = p2 - v.as_ref();
-    }
-}
-
-impl<P, S: ComplexField, const D: usize> Ray<P, Unit<SVector<S, D>>> {
-    #[inline]
-    #[must_use]
-    pub fn try_new_normalize(pos: impl Into<P>, dir: impl Into<SVector<S, D>>) -> Option<Self> {
-        Unit::try_new(dir.into(), zero()).map(|unit| Self::new(pos, unit))
-    }
-
-    /// # Panics
-    ///
-    /// if `dir` is zero
-    #[inline]
-    #[must_use]
-    pub fn new_normalize(pos: impl Into<P>, dir: impl Into<SVector<S, D>>) -> Self {
-        Self::try_new_normalize(pos, dir).expect("direction must not be zero")
     }
 }
 

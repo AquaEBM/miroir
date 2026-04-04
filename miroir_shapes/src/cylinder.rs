@@ -118,13 +118,14 @@ impl<S: RealField> Cylinder<S> {
 }
 
 impl<S: RealField> Mirror<SVector<S, 3>, Unit<SVector<S, 3>>> for Cylinder<S> {
-    type Reflector = Unit<SVector<S, 3>>;
+    type Reflector<'a> = Unit<SVector<S, 3>>;
     fn closest_intersection(
         &self,
-        ray: &Ray<SVector<S, 3>, Unit<SVector<S, 3>>>,
+        pos: &SVector<S, 3>,
+        dir: &Unit<SVector<S, 3>>,
         ctx: SimulationCtx<'_, S>,
-    ) -> Option<Intersection<S, Self::Reflector>> {
-        ctx.closest(self.tangents_at_intersections(&ray.pos, &ray.dir))
+    ) -> Option<Intersection<S, Self::Reflector<'_>>> {
+        ctx.closest(self.tangents_at_intersections(pos, dir))
     }
 }
 

@@ -1,4 +1,4 @@
-use miroir::Ray;
+use miroir::na::Unit;
 use miroir_glium::{RayParams, SimulationParams, SimulationWindow};
 use miroir_shapes::{LineSegment, Sphere};
 
@@ -18,10 +18,11 @@ fn main() {
         ..Default::default()
     };
 
+    #[rustfmt::skip]
     let rays = [
-        (Ray::new_normalize([0., 0.], [1., 1.]), params),
-        (Ray::new_normalize([0.25, 0.5], [1., 0.]), params),
-        (Ray::new_normalize([4., 0.5], [1., 0.]), params),
+        ([0., 0.].into(), Unit::new_normalize([1., 1.].into()), params),
+        ([0.25, 0.5].into(), Unit::new_normalize([1., 0.].into()), params),
+        ([4., 0.5].into(), Unit::new_normalize([1., 0.].into()), params),
     ];
 
     SimulationWindow::default().display(

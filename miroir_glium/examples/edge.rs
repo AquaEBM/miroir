@@ -1,10 +1,14 @@
-use miroir::Ray;
+use miroir::na::Unit;
 use miroir_glium::{RayParams, SimulationParams, SimulationWindow};
 use miroir_shapes::Simplex;
 
 fn main() {
     let mirror = Simplex::new([[1f32, 0.000001], [1., 1.]]);
-    let rays = [(Ray::new_normalize([0., 0.], [1., 0.]), RayParams::default())];
+    let rays = [(
+        [0., 0.].into(),
+        Unit::new_normalize([1., 0.].into()),
+        RayParams::default(),
+    )];
     SimulationWindow::default().display(
         &mirror,
         rays,

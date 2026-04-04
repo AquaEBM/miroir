@@ -3,6 +3,7 @@ use super::*;
 use camera::{Camera, CameraController};
 use core::f32::consts::{FRAC_PI_2, PI};
 use gl::index::{NoIndices, PrimitiveType};
+use miroir::MirrorExt;
 use na::{Perspective3, Point3};
 
 const LINE_STRIP: NoIndices = NoIndices(PrimitiveType::LineStrip);
@@ -72,9 +73,9 @@ void main() {
 }";
 
 impl<V: GLSimulationVertex + 'static> SimulationRenderData<V> {
-    pub(crate) fn from_simulation<D: Direction, P: Point<D> + ToGLVertex<Vertex = V>>(
-        mirror: &(impl Mirror<P, D, Reflector: Reflect<D>> + OpenGLRenderable + ?Sized),
-        rays: impl IntoIterator<Item = (Ray<P, D>, RayParams<D::Scalar>)>,
+    pub(crate) fn from_simulation<'a, D: Direction, P: Point<D> + ToGLVertex<Vertex = V>>(
+        mirror: &'a (impl Mirror<P, D, Reflector<'a>: Reflect<D>> + OpenGLRenderable + ?Sized),
+        rays: impl IntoIterator<Item = (P, D, RayParams<D::Scalar>)>,
         display: &gl::Display,
         global_params: SimulationParams,
     ) -> Self
@@ -103,29 +104,32 @@ impl<V: GLSimulationVertex + 'static> SimulationRenderData<V> {
         let mut ray_origins = vec![];
         let mut ray_paths = vec![];
 
-        for (mut ray, params) in rays {
-            ray_origins.push(ray.pos.to_gl_vertex());
+        for (mut pos, mut dir, params) in rays {
+            ray_origins.push(pos.to_gl_vertex());
 
             vertex_scratch.clear();
-            vertex_scratch.push(ray.pos.to_gl_vertex());
+            vertex_scratch.push(pos.to_gl_vertex());
 
             let mut count = 0;
             let mut outcome: Result<bool, usize> = Ok(true);
 
-            while let Some((dist, dir)) = ray.closest_intersection(mirror, &params.epsilon) {
+            while let Some((dist, reflector)) = mirror
+                .closest_with_tolerance(&params.epsilon, &pos, &dir)
+                .map(Into::into)
+            {
                 if params.reflection_cap.is_some_and(|n| count == n) {
                     outcome = Ok(false);
                     break;
                 }
-                ray.advance(&dist);
-                vertex_scratch.push(ray.pos.to_gl_vertex());
-                ray.reflect_dir(&dir);
+                pos.translate(&dir, &dist);
+                vertex_scratch.push(pos.to_gl_vertex());
+                reflector.reflect(&mut dir);
                 count += 1;
             }
 
             if let Ok(true) = outcome {
-                ray.advance(&10000.0.as_());
-                vertex_scratch.push(ray.pos.to_gl_vertex());
+                pos.translate(&dir, &10000.0.as_());
+                vertex_scratch.push(pos.to_gl_vertex());
             }
 
             ray_paths.push(RayPath {

@@ -1,7 +1,7 @@
 #![no_std]
 
 use eadk::kandinsky;
-use miroir::{Direction, Mirror, Point, Ray, Reflect, either::Either};
+use miroir::{Direction, Mirror, MirrorExt, Point, Reflect, either::Either};
 use num_traits::AsPrimitive;
 
 #[cfg(feature = "alloc")]
@@ -141,17 +141,17 @@ impl Default for SimulationParams {
     }
 }
 
-pub fn display_simulation<D: Direction<Scalar: Copy + 'static>, P: Point<D> + ToPoint>(
-    mirror: &(impl Mirror<P, D, Reflector: Reflect<D>> + KandinskyRenderable + ?Sized),
-    rays: impl IntoIterator<Item = (Ray<P, D>, RayParams<D::Scalar>)>,
+pub fn display_simulation<'a, D: Direction<Scalar: Copy + 'static>, P: Point<D> + ToPoint>(
+    mirror: &'a (impl Mirror<P, D, Reflector<'a>: Reflect<D>> + KandinskyRenderable + ?Sized),
+    rays: impl IntoIterator<Item = (P, D, RayParams<D::Scalar>)>,
     params: SimulationParams,
 ) where
     f64: AsPrimitive<D::Scalar>,
 {
     mirror.draw(params.mirror_color);
 
-    for (mut ray, params) in rays {
-        let mut prev_pt = ray.pos.to_point();
+    for (mut pos, mut dir, params) in rays {
+        let mut prev_pt = pos.to_point();
         let mut count = 0;
         let mut diverges = true;
 
@@ -161,13 +161,16 @@ pub fn display_simulation<D: Direction<Scalar: Copy + 'static>, P: Point<D> + To
                 break;
             }
 
-            if let Some((dist, dir)) = ray.closest_intersection(mirror, &params.eps) {
-                ray.advance(&dist);
-                let p1 = ray.pos.to_point();
+            if let Some((dist, reflector)) = mirror
+                .closest_with_tolerance(&params.eps, &pos, &dir)
+                .map(Into::into)
+            {
+                pos.translate(&dir, &dist);
+                let p1 = pos.to_point();
                 kandinsky::draw_line(prev_pt, p1, params.color);
                 prev_pt = p1;
                 eadk::time::sleep_ms(params.step_time_ms);
-                ray.reflect_dir(&dir);
+                reflector.reflect(&mut dir);
                 count += 1;
             } else {
                 break;
@@ -175,8 +178,8 @@ pub fn display_simulation<D: Direction<Scalar: Copy + 'static>, P: Point<D> + To
         }
 
         if diverges {
-            ray.advance(&410.0.as_());
-            kandinsky::draw_line(prev_pt, ray.pos.to_point(), params.color);
+            pos.translate(&dir, &410.0.as_());
+            kandinsky::draw_line(prev_pt, pos.to_point(), params.color);
         }
     }
 }

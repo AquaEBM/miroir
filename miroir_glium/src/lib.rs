@@ -1,8 +1,9 @@
 use core::{
-    array, ops::{Add, Mul}
+    array,
+    ops::{Add, Mul},
 };
 use num_traits::AsPrimitive;
-use std::{time, collections::TryReserveError, rc::Rc, sync::Arc};
+use std::{collections::TryReserveError, rc::Rc, sync::Arc, time};
 
 use gl::{backend::glutin::DisplayCreationError, glutin};
 
@@ -15,9 +16,9 @@ mod renderable;
 mod sim_render_data;
 use sim_render_data::SimulationRenderData;
 
-pub use miroir;
 pub use glium as gl;
 pub use glium_shapes as gl_shapes;
+pub use miroir;
 pub use renderable::*;
 
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
@@ -133,9 +134,9 @@ pub struct RayParams<S> {
     /// Whether to detect if the ray's path ends up in an infinite loop,
     /// and the epsilon value used for comparisons, and the color used to draw the section
     /// of the path that loops infinitely
-    pub loop_detection: Option<(S, [f32 ; 4])>,
+    pub loop_detection: Option<(S, [f32; 4])>,
     pub reflection_cap: Option<usize>,
-    pub path_color: [f32 ; 4],
+    pub path_color: [f32; 4],
 }
 
 impl<S: Copy + 'static> Default for RayParams<S>
@@ -154,8 +155,8 @@ where
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct SimulationParams {
-    pub mirror_color: [f32 ; 4],
-    pub bg_color: [f32 ; 4],
+    pub mirror_color: [f32; 4],
+    pub bg_color: [f32; 4],
 }
 
 impl Default for SimulationParams {
@@ -189,10 +190,10 @@ impl SimulationWindow {
     }
 
     #[inline]
-    pub fn display<D: Direction, P: Point<D> + ToGLVertex<Vertex: 'static>>(
+    pub fn display<'a, D: Direction, P: Point<D> + ToGLVertex<Vertex: 'static>>(
         self,
-        mirror: &(impl Mirror<P, D, Reflector: Reflect<D>> + OpenGLRenderable + ?Sized),
-        rays: impl IntoIterator<Item = (Ray<P, D>, RayParams<D::Scalar>)>,
+        mirror: &'a (impl Mirror<P, D, Reflector<'a>: Reflect<D>> + OpenGLRenderable + ?Sized),
+        rays: impl IntoIterator<Item = (P, D, RayParams<D::Scalar>)>,
         params: SimulationParams,
     ) where
         D::Scalar: Copy + 'static,

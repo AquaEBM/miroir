@@ -4,19 +4,20 @@ name = "miroir_glium"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+
+default = ["shapes"]
+shapes = ["dep:miroir_shapes"]
+
 [dependencies]
 
 miroir = { path = "../miroir" }
+miroir_shapes = { path = "../miroir_shapes", optional = true }
 
 # TODO: update this
 glium = "0.32"
-
-impl-trait-for-tuples = "0.2"
-num-traits = { version = "0.2", default-features = false }
-
 # TODO: work on getting rid of this
 glium_shapes = { git = "https://github.com/FlashOnFire/glium_shapes.git", branch = "glium-0.32.2" }
 
-[dev-dependencies]
-
-miroir_shapes = { path = "../miroir_shapes", features = ["glium"] }
+impl-trait-for-tuples = "0.2"
+num-traits = { version = "0.2", default-features = false }

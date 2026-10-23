@@ -248,19 +248,7 @@ impl<V: GLSimulationVertex + 'static> SimulationRenderData<V> {
             event::Event::DeviceEvent {
                 event: event::DeviceEvent::MouseMotion { delta, .. },
                 ..
-            } if mouse_pressed => {
-                let inner_window_size = display.gl_window().window().inner_size();
-
-                display
-                    .gl_window()
-                    .window()
-                    .set_cursor_position(dpi::PhysicalPosition {
-                        x: inner_window_size.width / 2,
-                        y: inner_window_size.height / 2,
-                    })
-                    .unwrap();
-                camera_controller.set_mouse_delta(delta.0, delta.1)
-            }
+            } if mouse_pressed => camera_controller.set_mouse_delta(delta.0, delta.1),
             _ => (),
         });
     }

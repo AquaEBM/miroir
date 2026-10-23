@@ -12,6 +12,9 @@ use alloc::{boxed::Box, rc::Rc, sync::Arc, vec::Vec};
 pub use eadk;
 pub use miroir;
 
+#[cfg(feature = "shapes")]
+mod shapes;
+
 pub trait ToPoint {
     fn to_point(&self) -> kandinsky::Point;
 }

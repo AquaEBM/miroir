@@ -42,7 +42,7 @@ impl<S: ComplexField, const D: usize> Sphere<S, D> {
 
         let v = pos - &self.center;
 
-        let b = v.dotc(&dir).real();
+        let b = v.dotc(dir).real();
         let c = v.norm_squared() - self.radius_sq.clone();
 
         let delta = b.clone().mul_add(b.clone(), -c);
@@ -89,83 +89,5 @@ impl<S: RealField, const D: usize> Mirror<SVector<S, D>, Unit<SVector<S, D>>> fo
                 .into_iter()
                 .flatten(),
         )
-    }
-}
-
-#[cfg(feature = "glium")]
-// Use glium_shapes::sphere::Sphere for the 3D implementation
-impl<S: RealField + AsPrimitive<f32>> OpenGLRenderable for Sphere<S, 3> {
-    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        let r = self.radius().as_();
-        let [x, y, z] = self.center.map(|s| s.as_()).into();
-
-        let sphere = gl_shapes::sphere::SphereBuilder::new()
-            .scale(r, r, r)
-            .translate(x, y, z)
-            .with_divisions(60, 60)
-            .build(display)
-            .unwrap();
-
-        list.push(Box::new(sphere))
-    }
-}
-
-#[cfg(feature = "glium")]
-struct Circle {
-    vertices: gl::VertexBuffer<Vertex2D>,
-}
-
-#[cfg(feature = "glium")]
-impl Circle {
-    fn new<const N: usize>(center: [f32; 2], radius: f32, display: &gl::Display) -> Self {
-        let c = SVector::from(center);
-
-        use core::f32::consts::TAU;
-
-        let points: [_; N] = core::array::from_fn(|i| {
-            let w = i as f32 / N as f32 * TAU;
-            let p = na::Vector2::new(w.cos(), w.sin());
-            (p * radius + c).into()
-        });
-
-        let vertices = gl::VertexBuffer::immutable(display, points.as_slice()).unwrap();
-
-        Self { vertices }
-    }
-}
-
-#[cfg(feature = "glium")]
-impl RenderData for Circle {
-    fn vertices(&self) -> gl::vertex::VerticesSource<'_> {
-        (&self.vertices).into()
-    }
-
-    fn indices(&self) -> gl::index::IndicesSource<'_> {
-        gl::index::IndicesSource::NoIndices {
-            primitives: gl::index::PrimitiveType::LineLoop,
-        }
-    }
-}
-
-#[cfg(feature = "glium")]
-// in 2D, the list of vertices of a circle is easy to calculate
-impl<S: RealField + AsPrimitive<f32>> OpenGLRenderable for Sphere<S, 2> {
-    fn append_render_data(&self, display: &gl::Display, list: &mut List<Box<dyn RenderData>>) {
-        list.push(Box::new(Circle::new::<360>(
-            self.center.map(|s| s.as_()).into(),
-            self.radius().as_(),
-            display,
-        )))
-    }
-}
-
-#[cfg(feature = "numworks")]
-impl<S: RealField + AsPrimitive<i16>> miroir_numworks::KandinskyRenderable for Sphere<S, 2> {
-    fn draw(&self, color: kandinsky::Color) {
-        kandinsky::draw_circle(
-            self.center.to_point(),
-            self.radius().as_().unsigned_abs(),
-            color,
-        );
     }
 }

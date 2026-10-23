@@ -16,6 +16,9 @@ mod renderable;
 mod sim_render_data;
 use sim_render_data::SimulationRenderData;
 
+#[cfg(feature = "shapes")]
+mod shapes;
+
 pub use glium as gl;
 pub use glium_shapes as gl_shapes;
 pub use miroir;
@@ -145,7 +148,7 @@ where
 {
     fn default() -> Self {
         Self {
-            epsilon: 1e-6.as_(),
+            epsilon: 1e-4.as_(),
             loop_detection: None,
             reflection_cap: None,
             path_color: [1., 1., 1., 1.],

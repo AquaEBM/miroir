@@ -66,7 +66,7 @@ fn main() {
     const CENTER: [f32; 2] = [160., 129.];
 
     let mirrors = (
-        Sphere::new(CENTER, 50.),
+        Sphere::new(CENTER, 50f32),
         [
             LineSegment::new([TOP_LEFT, TOP_RIGHT]),
             LineSegment::new([TOP_LEFT, BOTTOM_LEFT]),
@@ -80,6 +80,7 @@ fn main() {
         Unit::new_normalize([2., 1.].into()),
         RayParams {
             reflection_cap: Some(100),
+            step_time_ms: 100,
             ..Default::default()
         },
     )];

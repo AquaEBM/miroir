@@ -3,3 +3,4 @@
 /.vscode
 /.idea
 /vendor
+.DS_Store

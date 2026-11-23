@@ -121,7 +121,7 @@ where
     fn default() -> Self {
         Self {
             reflection_cap: None,
-            eps: 1e-6.as_(),
+            eps: 1e-3.as_(),
             color: kandinsky::Color::from_rgb([248, 180, 48]),
             step_time_ms: 0,
         }
